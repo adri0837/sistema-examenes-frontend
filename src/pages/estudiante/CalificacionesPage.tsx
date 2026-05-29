@@ -1,19 +1,46 @@
+import { useState, useEffect } from 'react';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
+import api from '../../api/axios';
 
-// Datos de prueba — se reemplazarán con llamadas al backend
-const calificacionesEjemplo = [
-    { id: '1', titulo: 'Examen de Historia', categoria: 'Historia', calificacion: 85, fecha: '2024-03-10', estado: 'CALIFICADO' },
-    { id: '2', titulo: 'Examen de Ciencias', categoria: 'Ciencias', calificacion: null, fecha: '2024-03-12', estado: 'ENTREGADO' },
-];
+interface Intento {
+    id: string;
+    estado: string;
+    calificacion_final: number | null;
+    entregado_en: string;
+    examen: {
+        titulo: string;
+        descripcion: string | null;
+        categoria: { nombre: string };
+    };
+}
 
 const CalificacionesPage = () => {
+    const [calificaciones, setCalificaciones] = useState<Intento[]>([]);
+    const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const cargar = async () => {
+            try {
+                const { data } = await api.get('/estudiante/calificaciones');
+                setCalificaciones(data);
+            } catch {
+                setError('Error al cargar calificaciones');
+            } finally {
+                setCargando(false);
+            }
+        };
+        cargar();
+    }, []);
+
     return (
         <div>
             <NavbarEstudiante />
             <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
                 <h2>Mis Calificaciones</h2>
+                {error && <p style={{ color: 'red', fontSize: '13px' }}>{error}</p>}
 
-                {calificacionesEjemplo.length === 0 ? (
+                {cargando ? <p style={{ color: '#666' }}>Cargando...</p> : calificaciones.length === 0 ? (
                     <p style={{ color: '#666', marginTop: '1rem' }}>Aún no has completado ningún examen.</p>
                 ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
@@ -26,14 +53,14 @@ const CalificacionesPage = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {calificacionesEjemplo.map(item => (
+                            {calificaciones.map(item => (
                                 <tr key={item.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.titulo}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.categoria}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.fecha}</td>
+                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.examen.titulo}</td>
+                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.examen.categoria.nombre}</td>
+                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{new Date(item.entregado_en).toLocaleDateString()}</td>
                                     <td style={{ padding: '0.75rem', fontSize: '14px' }}>
                                         {item.estado === 'CALIFICADO'
-                                            ? <span style={{ fontWeight: 'bold', color: '#276749' }}>{item.calificacion} / 100</span>
+                                            ? <span style={{ fontWeight: 'bold', color: '#276749' }}>{item.calificacion_final}</span>
                                             : <span style={{ background: '#FEFCBF', color: '#744210', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>En revisión</span>
                                         }
                                     </td>

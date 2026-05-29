@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from './ProtectedRoute';
 import LoginPage from '../pages/auth/LoginPage';
+import RegistroPage from '../pages/auth/RegistroPage';
 
 // Estudiante
 import DashboardEstudiante from '../pages/estudiante/DashboardEstudiante';
@@ -42,6 +43,7 @@ const AppRouter = () => {
                 <Route path="/admin/reportes" element={<ProtectedRoute rolRequerido="ADMIN"><ReportesPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<Navigate to="/login" replace />} />
+                <Route path="/registro" element={!usuario ? <RegistroPage /> : <Navigate to={usuario.rol === 'ADMIN' ? '/admin' : '/estudiante'} replace />} />
             </Routes>
         </BrowserRouter>
     );

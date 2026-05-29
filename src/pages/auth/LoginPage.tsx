@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
 
 const LoginPage = () => {
@@ -34,8 +34,12 @@ const LoginPage = () => {
                     style={{ padding: '0.6rem', backgroundColor: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
                     Entrar
                 </button>
+                <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>
+                    ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+                </p>
             </div>
         </div>
+
     );
 };
 
