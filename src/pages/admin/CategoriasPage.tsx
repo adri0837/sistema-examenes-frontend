@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
+import './Admin.css';
 
 interface Categoria {
     id: string;
@@ -80,83 +81,89 @@ const CategoriasPage = () => {
     };
 
     return (
-        <div>
-            <NavbarAdmin />
-            <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2>Gestión de Categorías</h2>
-                    <button onClick={() => { setMostrarForm(!mostrarForm); setEditando(null); setNombre(''); setDescripcion(''); }}
-                        style={{ padding: '0.5rem 1rem', background: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
-                        {mostrarForm ? 'Cancelar' : '+ Nueva categoría'}
-                    </button>
-                </div>
-
-                {error && <p style={{ color: 'red', fontSize: '13px', marginTop: '0.5rem' }}>{error}</p>}
-
-                {(mostrarForm || editando) && (
-                    <div style={{ marginTop: '1rem', padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        <div>
-                            <label style={{ fontSize: '13px', display: 'block', marginBottom: '4px' }}>Nombre</label>
-                            <input value={nombre} onChange={e => setNombre(e.target.value)}
-                                style={{ padding: '0.4rem 0.6rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px' }} />
-                        </div>
-                        <div>
-                            <label style={{ fontSize: '13px', display: 'block', marginBottom: '4px' }}>Descripción (opcional)</label>
-                            <input value={descripcion} onChange={e => setDescripcion(e.target.value)}
-                                style={{ padding: '0.4rem 0.6rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px', width: '250px' }} />
-                        </div>
-                        <button onClick={editando ? handleEditar : handleCrear}
-                            style={{ padding: '0.4rem 1rem', background: '#38A169', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
-                            {editando ? 'Guardar cambios' : 'Crear'}
+        <div className="admin-layout">
+            <div className="admin-content-wrapper">
+                <NavbarAdmin />
+                
+                <div className="admin-page-container">
+                    <div className="admin-header-flex">
+                        <h2>Gestión de Categorías</h2>
+                        <button onClick={() => { setMostrarForm(!mostrarForm); setEditando(null); setNombre(''); setDescripcion(''); }} className="btn-primary">
+                            {mostrarForm ? 'Cancelar' : '+ Nueva categoría'}
                         </button>
-                        {editando && (
-                            <button onClick={cancelar}
-                                style={{ padding: '0.4rem 1rem', background: '#E2E8F0', color: '#4A5568', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
-                                Cancelar
-                            </button>
-                        )}
                     </div>
-                )}
 
-                {cargando ? <p style={{ marginTop: '1rem', color: '#666' }}>Cargando...</p> : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem' }}>
-                        <thead>
-                            <tr style={{ background: '#F7FAFC', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Nombre</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Descripción</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Exámenes</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {categorias.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '14px' }}>
-                                        No hay categorías registradas
-                                    </td>
-                                </tr>
-                            ) : (
-                                categorias.map(c => (
-                                    <tr key={c.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c.nombre}</td>
-                                        <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{c.descripcion || '—'}</td>
-                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c._count.examenes}</td>
-                                        <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-                                            <button onClick={() => iniciarEdicion(c)}
-                                                style={{ padding: '0.3rem 0.7rem', background: '#ECC94B', color: '#744210', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                                                Editar
-                                            </button>
-                                            <button onClick={() => handleEliminar(c.id)} disabled={c._count.examenes > 0}
-                                                style={{ padding: '0.3rem 0.7rem', background: c._count.examenes > 0 ? '#E2E8F0' : '#E53E3E', color: c._count.examenes > 0 ? '#999' : 'white', border: 'none', borderRadius: '4px', cursor: c._count.examenes > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
-                                                Eliminar
-                                            </button>
-                                        </td>
+                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+
+                    {(mostrarForm || editando) && (
+                        <div className="admin-form-card">
+                            <div className="admin-form-group">
+                                <label>Nombre de la categoría</label>
+                                <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Matemáticas" />
+                            </div>
+                            <div className="admin-form-group">
+                                <label>Descripción (opcional)</label>
+                                <input value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Breve descripción..." />
+                            </div>
+                            <div style={{ paddingBottom: '2px', display: 'flex', gap: '0.8rem' }}>
+                                <button onClick={editando ? handleEditar : handleCrear} className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
+                                    {editando ? 'Guardar cambios' : 'Crear categoría'}
+                                </button>
+                                {editando && (
+                                    <button onClick={cancelar} className="action-btn" style={{ padding: '0.75rem 1.5rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                        Cancelar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando categorías...</p> : (
+                        <div className="admin-table-container">
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Descripción</th>
+                                        <th>Exámenes asociados</th>
+                                        <th>Acciones</th>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                )}
+                                </thead>
+                                <tbody>
+                                    {categorias.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} style={{ textAlign: 'center', color: '#64748b', padding: '3rem' }}>
+                                                No hay categorías registradas en el sistema.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        categorias.map(c => (
+                                            <tr key={c.id}>
+                                                <td style={{ fontWeight: 500 }}>{c.nombre}</td>
+                                                <td style={{ color: '#94a3b8' }}>{c.descripcion || '—'}</td>
+                                                <td>
+                                                    <span className="badge badge-active" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
+                                                        {c._count.examenes} examen(es)
+                                                    </span>
+                                                </td>
+                                                <td style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button onClick={() => iniciarEdicion(c)}
+                                                        className="action-btn" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15' }}>
+                                                        Editar
+                                                    </button>
+                                                    <button onClick={() => handleEliminar(c.id)} disabled={c._count.examenes > 0}
+                                                        className="action-btn btn-danger" style={{ opacity: c._count.examenes > 0 ? 0.3 : 1, cursor: c._count.examenes > 0 ? 'not-allowed' : 'pointer' }}>
+                                                        Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
