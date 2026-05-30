@@ -10,15 +10,15 @@ const DashboardEstudiante = () => {
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarEstudiante />
-                <div className="admin-page-container">
-                    <div style={{ marginBottom: '2rem' }}>
+                <div className="admin-page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4rem' }}>
+                    <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
                         <h1 style={{ fontSize: '2.5rem', fontWeight: 700, margin: '0 0 0.5rem', background: 'linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                             Bienvenido, {usuario?.nombre}
                         </h1>
                         <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>¿Qué quieres hacer hoy?</p>
                     </div>
 
-                    <div className="admin-cards-grid">
+                    <div className="admin-cards-grid" style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
                         <Link to="/estudiante/examenes" className="admin-card">
                             <div className="admin-card-emoji">📝</div>
                             <h3 className="admin-card-title">Exámenes</h3>
