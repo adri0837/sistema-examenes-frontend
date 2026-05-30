@@ -18,21 +18,17 @@ const DashboardEstudiante = () => {
                         <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>¿Qué quieres hacer hoy?</p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-                        <Link to="/estudiante/examenes" style={{ textDecoration: 'none' }}>
-                            <div className="admin-dashboard-card" style={{ width: '240px', padding: '2rem' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
-                                <h3 style={{ margin: '0', color: '#f8fafc', fontSize: '1.25rem' }}>Exámenes</h3>
-                                <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0.5rem 0 0' }}>Ver exámenes disponibles y realizar intentos</p>
-                            </div>
+                    <div className="admin-cards-grid">
+                        <Link to="/estudiante/examenes" className="admin-card">
+                            <div className="admin-card-emoji">📝</div>
+                            <h3 className="admin-card-title">Exámenes</h3>
+                            <p className="admin-card-desc">Ver exámenes disponibles y realizar intentos</p>
                         </Link>
 
-                        <Link to="/estudiante/calificaciones" style={{ textDecoration: 'none' }}>
-                            <div className="admin-dashboard-card" style={{ width: '240px', padding: '2rem' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏆</div>
-                                <h3 style={{ margin: '0', color: '#f8fafc', fontSize: '1.25rem' }}>Calificaciones</h3>
-                                <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0.5rem 0 0' }}>Ver mis resultados y progreso académico</p>
-                            </div>
+                        <Link to="/estudiante/calificaciones" className="admin-card">
+                            <div className="admin-card-emoji">🏆</div>
+                            <h3 className="admin-card-title">Calificaciones</h3>
+                            <p className="admin-card-desc">Ver mis resultados y progreso académico</p>
                         </Link>
                     </div>
                 </div>
