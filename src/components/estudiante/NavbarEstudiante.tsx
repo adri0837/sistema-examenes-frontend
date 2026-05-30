@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import '../admin/Admin.css';
+import '../../pages/admin/Admin.css';
 
 const NavbarEstudiante = () => {
     const { usuario, logout } = useAuth();
