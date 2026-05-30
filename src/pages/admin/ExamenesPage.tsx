@@ -154,40 +154,50 @@ const ExamenesPage = () => {
                                 <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Acciones</th>
                             </tr>
                         </thead>
+
                         <tbody>
-                            {examenes.map(ex => (
-                                <tr key={ex.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.titulo}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{ex.descripcion || '—'}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.categoria.nombre}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.tiempo_limite_min ? `${ex.tiempo_limite_min} min` : 'Sin límite'}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>
-                                        {ex.publicado
-                                            ? <span style={{ background: '#C6F6D5', color: '#276749', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Publicado</span>
-                                            : <span style={{ background: '#E2E8F0', color: '#4A5568', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Borrador</span>}
-                                    </td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex._count.intentos}</td>
-                                    <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                        <button onClick={() => navigate(`/admin/examenes/${ex.id}`)}
-                                            style={{ padding: '0.3rem 0.7rem', background: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                                            Preguntas
-                                        </button>
-                                        <button onClick={() => iniciarEdicion(ex)} disabled={ex._count.intentos > 0}
-                                            style={{ padding: '0.3rem 0.7rem', background: ex._count.intentos > 0 ? '#E2E8F0' : '#ECC94B', color: ex._count.intentos > 0 ? '#999' : '#744210', border: 'none', borderRadius: '4px', cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
-                                            Editar
-                                        </button>
-                                        <button onClick={() => handleEliminar(ex.id)} disabled={ex._count.intentos > 0}
-                                            style={{ padding: '0.3rem 0.7rem', background: ex._count.intentos > 0 ? '#E2E8F0' : '#E53E3E', color: ex._count.intentos > 0 ? '#999' : 'white', border: 'none', borderRadius: '4px', cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
-                                            Eliminar
-                                        </button>
-                                        <button onClick={() => handleTogglePublicado(ex.id)}
-                                            style={{ padding: '0.3rem 0.7rem', background: ex.publicado ? '#718096' : '#38A169', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                                            {ex.publicado ? 'Despublicar' : 'Publicar'}
-                                        </button>
+                            {examenes.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                                        No hay exámenes registrados
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                examenes.map(ex => (
+                                    <tr key={ex.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.titulo}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{ex.descripcion || '—'}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.categoria.nombre}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex.tiempo_limite_min ? `${ex.tiempo_limite_min} min` : 'Sin límite'}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>
+                                            {ex.publicado
+                                                ? <span style={{ background: '#C6F6D5', color: '#276749', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Publicado</span>
+                                                : <span style={{ background: '#E2E8F0', color: '#4A5568', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Borrador</span>}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{ex._count.intentos}</td>
+                                        <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                            <button onClick={() => navigate(`/admin/examenes/${ex.id}`)}
+                                                style={{ padding: '0.3rem 0.7rem', background: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                                Preguntas
+                                            </button>
+                                            <button onClick={() => iniciarEdicion(ex)} disabled={ex._count.intentos > 0}
+                                                style={{ padding: '0.3rem 0.7rem', background: ex._count.intentos > 0 ? '#E2E8F0' : '#ECC94B', color: ex._count.intentos > 0 ? '#999' : '#744210', border: 'none', borderRadius: '4px', cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
+                                                Editar
+                                            </button>
+                                            <button onClick={() => handleEliminar(ex.id)} disabled={ex._count.intentos > 0}
+                                                style={{ padding: '0.3rem 0.7rem', background: ex._count.intentos > 0 ? '#E2E8F0' : '#E53E3E', color: ex._count.intentos > 0 ? '#999' : 'white', border: 'none', borderRadius: '4px', cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
+                                                Eliminar
+                                            </button>
+                                            <button onClick={() => handleTogglePublicado(ex.id)}
+                                                style={{ padding: '0.3rem 0.7rem', background: ex.publicado ? '#718096' : '#38A169', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                                {ex.publicado ? 'Despublicar' : 'Publicar'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
+
                     </table>
                 )}
             </div>

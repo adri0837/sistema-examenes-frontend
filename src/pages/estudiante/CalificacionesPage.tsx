@@ -24,8 +24,8 @@ const CalificacionesPage = () => {
             try {
                 const { data } = await api.get('/estudiante/calificaciones');
                 setCalificaciones(data);
-            } catch {
-                setError('Error al cargar calificaciones');
+            } catch (e: any) {
+                setError(e.response?.data?.message || e.message || 'Error al cargar calificaciones');
             } finally {
                 setCargando(false);
             }

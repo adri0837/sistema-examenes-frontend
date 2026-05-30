@@ -55,7 +55,7 @@ const RevisionPage = () => {
                 {error && <p style={{ color: 'red', fontSize: '13px' }}>{error}</p>}
 
                 {cargando ? <p style={{ color: '#666' }}>Cargando...</p> : pendientes.length === 0 ? (
-                    <p style={{ color: '#666', marginTop: '1rem' }}>✅ No hay respuestas pendientes de revisión.</p>
+                    <p style={{ color: '#666', marginTop: '1rem' }}>No hay respuestas pendientes de revisión.</p>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                         {pendientes.map(intento => (

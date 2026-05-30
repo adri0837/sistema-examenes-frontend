@@ -129,23 +129,31 @@ const CategoriasPage = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {categorias.map(c => (
-                                <tr key={c.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c.nombre}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{c.descripcion || '—'}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c._count.examenes}</td>
-                                    <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-                                        <button onClick={() => iniciarEdicion(c)}
-                                            style={{ padding: '0.3rem 0.7rem', background: '#ECC94B', color: '#744210', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                                            Editar
-                                        </button>
-                                        <button onClick={() => handleEliminar(c.id)} disabled={c._count.examenes > 0}
-                                            style={{ padding: '0.3rem 0.7rem', background: c._count.examenes > 0 ? '#E2E8F0' : '#E53E3E', color: c._count.examenes > 0 ? '#999' : 'white', border: 'none', borderRadius: '4px', cursor: c._count.examenes > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
-                                            Eliminar
-                                        </button>
+                            {categorias.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                                        No hay categorías registradas
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                categorias.map(c => (
+                                    <tr key={c.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c.nombre}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{c.descripcion || '—'}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{c._count.examenes}</td>
+                                        <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                                            <button onClick={() => iniciarEdicion(c)}
+                                                style={{ padding: '0.3rem 0.7rem', background: '#ECC94B', color: '#744210', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                                Editar
+                                            </button>
+                                            <button onClick={() => handleEliminar(c.id)} disabled={c._count.examenes > 0}
+                                                style={{ padding: '0.3rem 0.7rem', background: c._count.examenes > 0 ? '#E2E8F0' : '#E53E3E', color: c._count.examenes > 0 ? '#999' : 'white', border: 'none', borderRadius: '4px', cursor: c._count.examenes > 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}>
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 )}

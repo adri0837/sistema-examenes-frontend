@@ -46,10 +46,21 @@ const UsuariosPage = () => {
 
     const handleToggleActivo = async (id: string) => {
         try {
+            setError('');
             await api.patch(`/usuarios/${id}/toggle-activo`);
             cargarUsuarios();
         } catch {
             setError('Error al actualizar usuario');
+        }
+    };
+
+    const handleEliminar = async (id: string) => {
+        try {
+            setError('');
+            await api.delete(`/usuarios/${id}`);
+            cargarUsuarios();
+        } catch (e: any) {
+            setError(e.response?.data?.message || 'Error al eliminar usuario');
         }
     };
 
@@ -99,28 +110,42 @@ const UsuariosPage = () => {
                                 <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Email</th>
                                 <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Fecha de registro</th>
                                 <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Estado</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Acción</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {usuarios.map(u => (
-                                <tr key={u.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{u.nombre}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{u.email}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{new Date(u.creado_en).toLocaleDateString()}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>
-                                        {u.activo
-                                            ? <span style={{ background: '#C6F6D5', color: '#276749', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Activo</span>
-                                            : <span style={{ background: '#FED7D7', color: '#9B2C2C', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Inactivo</span>}
-                                    </td>
-                                    <td style={{ padding: '0.75rem' }}>
-                                        <button onClick={() => handleToggleActivo(u.id)}
-                                            style={{ padding: '0.3rem 0.7rem', background: u.activo ? '#E53E3E' : '#38A169', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
-                                            {u.activo ? 'Desactivar' : 'Activar'}
-                                        </button>
+                            {usuarios.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                                        No hay estudiantes registrados
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                usuarios.map(u => (
+                                    <tr key={u.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{u.nombre}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{u.email}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>{new Date(u.creado_en).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '14px' }}>
+                                            {u.activo
+                                                ? <span style={{ background: '#C6F6D5', color: '#276749', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Activo</span>
+                                                : <span style={{ background: '#FED7D7', color: '#9B2C2C', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Inactivo</span>}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+                                            <button onClick={() => handleToggleActivo(u.id)}
+                                                style={{ padding: '0.3rem 0.7rem', background: u.activo ? '#E53E3E' : '#38A169', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                                {u.activo ? 'Desactivar' : 'Activar'}
+                                            </button>
+                                            {!u.activo && (
+                                                <button onClick={() => handleEliminar(u.id)}
+                                                    style={{ padding: '0.3rem 0.7rem', background: '#742A2A', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>
+                                                    Eliminar
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 )}

@@ -29,8 +29,8 @@ const ExamenesDisponiblesPage = () => {
             try {
                 const { data } = await api.get('/estudiante/examenes-disponibles');
                 setExamenes(data);
-            } catch {
-                setError('Error al cargar exámenes');
+            } catch (e: any) {
+                setError(e.response?.data?.message || e.message || 'Error al cargar exámenes');
             } finally {
                 setCargando(false);
             }
