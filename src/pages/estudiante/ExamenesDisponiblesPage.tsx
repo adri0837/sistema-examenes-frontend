@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
+import '../admin/Admin.css';
 
 interface Intento {
     estado: string;
@@ -48,55 +49,66 @@ const ExamenesDisponiblesPage = () => {
     };
 
     return (
-        <div>
-            <NavbarEstudiante />
-            <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-                <h2>Exámenes Disponibles</h2>
-                {error && <p style={{ color: 'red', fontSize: '13px' }}>{error}</p>}
+        <div className="admin-layout">
+            <div className="admin-content-wrapper">
+                <NavbarEstudiante />
+                <div className="admin-page-container">
+                    <div className="admin-header-flex">
+                        <h2>Exámenes Disponibles</h2>
+                    </div>
+                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
 
-                {cargando ? <p style={{ color: '#666' }}>Cargando...</p> : examenes.length === 0 ? (
-                    <p style={{ color: '#666', marginTop: '1rem' }}>No hay exámenes disponibles por el momento.</p>
-                ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
-                        <thead>
-                            <tr style={{ background: '#F7FAFC', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Título</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Descripción</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Categoría</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Preguntas</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Tiempo límite</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Estado</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {examenes.map(examen => (
-                                <tr key={examen.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{examen.titulo}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px', color: '#666' }}>{examen.descripcion || '—'}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{examen.categoria.nombre}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{examen._count.preguntas}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{examen.tiempo_limite_min ? `${examen.tiempo_limite_min} min` : 'Sin límite'}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>
-                                        {examen.intento
-                                            ? <span style={{ background: '#C6F6D5', color: '#276749', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Completado</span>
-                                            : <span style={{ background: '#BEE3F8', color: '#2A69AC', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>Disponible</span>
-                                        }
-                                    </td>
-                                    <td style={{ padding: '0.75rem' }}>
-                                        {examen.intento
-                                            ? <span style={{ fontSize: '13px', color: '#999' }}>No disponible</span>
-                                            : <button onClick={() => handleIniciar(examen.id)}
-                                                style={{ padding: '0.35rem 0.75rem', background: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-                                                Iniciar
-                                            </button>
-                                        }
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando exámenes...</p> : examenes.length === 0 ? (
+                        <div className="admin-table-container" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                            <p>No hay exámenes disponibles por el momento.</p>
+                        </div>
+                    ) : (
+                        <div className="admin-table-container">
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Título</th>
+                                        <th>Descripción</th>
+                                        <th>Categoría</th>
+                                        <th>Preguntas</th>
+                                        <th>Tiempo límite</th>
+                                        <th>Estado</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {examenes.map(examen => (
+                                        <tr key={examen.id}>
+                                            <td style={{ fontWeight: 500 }}>{examen.titulo}</td>
+                                            <td style={{ color: '#94a3b8' }}>{examen.descripcion || '—'}</td>
+                                            <td>
+                                                <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
+                                                    {examen.categoria.nombre}
+                                                </span>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>{examen._count.preguntas}</td>
+                                            <td>{examen.tiempo_limite_min ? `${examen.tiempo_limite_min} min` : 'Sin límite'}</td>
+                                            <td>
+                                                {examen.intento
+                                                    ? <span className="badge badge-active">Completado</span>
+                                                    : <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>Disponible</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                {examen.intento
+                                                    ? <span style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No disponible</span>
+                                                    : <button onClick={() => handleIniciar(examen.id)} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '13px' }}>
+                                                        Iniciar examen
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

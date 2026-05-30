@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
+import '../admin/Admin.css';
 
 interface Intento {
     id: string;
@@ -34,41 +35,53 @@ const CalificacionesPage = () => {
     }, []);
 
     return (
-        <div>
-            <NavbarEstudiante />
-            <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-                <h2>Mis Calificaciones</h2>
-                {error && <p style={{ color: 'red', fontSize: '13px' }}>{error}</p>}
+        <div className="admin-layout">
+            <div className="admin-content-wrapper">
+                <NavbarEstudiante />
+                <div className="admin-page-container">
+                    <div className="admin-header-flex">
+                        <h2>Mis Calificaciones</h2>
+                    </div>
+                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
 
-                {cargando ? <p style={{ color: '#666' }}>Cargando...</p> : calificaciones.length === 0 ? (
-                    <p style={{ color: '#666', marginTop: '1rem' }}>Aún no has completado ningún examen.</p>
-                ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
-                        <thead>
-                            <tr style={{ background: '#F7FAFC', textAlign: 'left' }}>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Examen</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Categoría</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Fecha</th>
-                                <th style={{ padding: '0.75rem', borderBottom: '2px solid #E2E8F0', fontSize: '13px' }}>Calificación</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {calificaciones.map(item => (
-                                <tr key={item.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.examen.titulo}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{item.examen.categoria.nombre}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>{new Date(item.entregado_en).toLocaleDateString()}</td>
-                                    <td style={{ padding: '0.75rem', fontSize: '14px' }}>
-                                        {item.estado === 'CALIFICADO'
-                                            ? <span style={{ fontWeight: 'bold', color: '#276749' }}>{item.calificacion_final}</span>
-                                            : <span style={{ background: '#FEFCBF', color: '#744210', padding: '2px 8px', borderRadius: '99px', fontSize: '12px' }}>En revisión</span>
-                                        }
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando calificaciones...</p> : calificaciones.length === 0 ? (
+                        <div className="admin-table-container" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                            <p>Aún no has completado ningún examen.</p>
+                        </div>
+                    ) : (
+                        <div className="admin-table-container">
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Examen</th>
+                                        <th>Categoría</th>
+                                        <th>Fecha de Entrega</th>
+                                        <th>Calificación Final</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {calificaciones.map(item => (
+                                        <tr key={item.id}>
+                                            <td style={{ fontWeight: 500, fontSize: '15px' }}>{item.examen.titulo}</td>
+                                            <td>
+                                                <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
+                                                    {item.examen.categoria.nombre}
+                                                </span>
+                                            </td>
+                                            <td style={{ color: '#94a3b8' }}>{new Date(item.entregado_en).toLocaleDateString()} a las {new Date(item.entregado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                                            <td>
+                                                {item.estado === 'CALIFICADO'
+                                                    ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.2rem' }}>{item.calificacion_final} / 100</span>
+                                                    : <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>En revisión</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
