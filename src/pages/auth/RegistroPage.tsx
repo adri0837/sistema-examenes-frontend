@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
+import './LoginPage.css';
 
 const RegistroPage = () => {
     const navigate = useNavigate();
@@ -22,26 +23,56 @@ const RegistroPage = () => {
     };
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px' }}>
-                <h2 style={{ textAlign: 'center' }}>Crear cuenta</h2>
+        <div className="login-container">
+            <div className="login-card">
+                <div className="login-header">
+                    <h2>Crear Cuenta</h2>
+                    <p>Únete como estudiante o docente</p>
+                </div>
 
                 {exito ? (
-                    <p style={{ color: 'green', textAlign: 'center' }}>✅ Cuenta creada correctamente. Redirigiendo al login...</p>
+                    <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(46, 204, 113, 0.2)', borderRadius: '10px', border: '1px solid rgba(46, 204, 113, 0.4)' }}>
+                        <p style={{ color: '#2ecc71', margin: 0, fontWeight: 600 }}>✅ Cuenta creada correctamente.</p>
+                        <p style={{ color: '#a8c0ff', fontSize: '0.85rem', marginTop: '0.5rem' }}>Redirigiendo al login...</p>
+                    </div>
                 ) : (
                     <>
-                        <input placeholder="Nombre completo" value={nombre} onChange={e => setNombre(e.target.value)}
-                            style={{ padding: '0.5rem', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }} />
-                        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-                            style={{ padding: '0.5rem', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }} />
-                        <input type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)}
-                            style={{ padding: '0.5rem', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }} />
-                        {error && <p style={{ color: 'red', fontSize: '13px', margin: 0 }}>{error}</p>}
-                        <button onClick={handleRegistro}
-                            style={{ padding: '0.6rem', backgroundColor: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
+                        <div className="input-group">
+                            <label>Nombre Completo</label>
+                            <input 
+                                placeholder="Tu nombre" 
+                                value={nombre} 
+                                onChange={e => setNombre(e.target.value)} 
+                            />
+                        </div>
+                        
+                        <div className="input-group">
+                            <label>Correo Electrónico</label>
+                            <input 
+                                type="email" 
+                                placeholder="tu@email.com" 
+                                value={email} 
+                                onChange={e => setEmail(e.target.value)} 
+                            />
+                        </div>
+                        
+                        <div className="input-group">
+                            <label>Contraseña</label>
+                            <input 
+                                type="password" 
+                                placeholder="••••••••" 
+                                value={password} 
+                                onChange={e => setPassword(e.target.value)} 
+                            />
+                        </div>
+                        
+                        {error && <p className="error-message">{error}</p>}
+                        
+                        <button onClick={handleRegistro} className="btn-submit">
                             Registrarse
                         </button>
-                        <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>
+                        
+                        <p className="login-footer">
                             ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
                         </p>
                     </>

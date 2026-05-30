@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
+import './LoginPage.css';
 
 const LoginPage = () => {
     const { login } = useAuth();
@@ -22,24 +23,44 @@ const LoginPage = () => {
     };
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px' }}>
-                <h2 style={{ textAlign: 'center' }}>Iniciar Sesión</h2>
-                <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-                    style={{ padding: '0.5rem', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }} />
-                <input type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)}
-                    style={{ padding: '0.5rem', fontSize: '14px', borderRadius: '4px', border: '1px solid #ccc' }} />
-                {error && <p style={{ color: 'red', fontSize: '13px', margin: 0 }}>{error}</p>}
-                <button onClick={handleLogin}
-                    style={{ padding: '0.6rem', backgroundColor: '#534AB7', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>
-                    Entrar
+        <div className="login-container">
+            <div className="login-card">
+                <div className="login-header">
+                    <h2>Sistema de Exámenes</h2>
+                    <p>Inicia sesión para continuar</p>
+                </div>
+                
+                <div className="input-group">
+                    <label>Correo Electrónico</label>
+                    <input 
+                        type="email" 
+                        placeholder="tu@email.com" 
+                        value={email} 
+                        onChange={e => setEmail(e.target.value)} 
+                    />
+                </div>
+                
+                <div className="input-group">
+                    <label>Contraseña</label>
+                    <input 
+                        type="password" 
+                        placeholder="••••••••" 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                    />
+                </div>
+                
+                {error && <p className="error-message">{error}</p>}
+                
+                <button onClick={handleLogin} className="btn-submit">
+                    Entrar a la Plataforma
                 </button>
-                <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>
-                    ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+                
+                <p className="login-footer">
+                    ¿No tienes cuenta? <Link to="/registro">Regístrate como estudiante</Link>
                 </p>
             </div>
         </div>
-
     );
 };
 
