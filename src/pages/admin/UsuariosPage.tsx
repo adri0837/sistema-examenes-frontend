@@ -56,6 +56,7 @@ const UsuariosPage = () => {
     };
 
     const handleEliminar = async (id: string) => {
+        if (!window.confirm('¿Eliminar permanentemente este estudiante?')) return;
         try {
             setError('');
             await api.delete(`/usuarios/${id}`);

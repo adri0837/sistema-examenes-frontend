@@ -26,6 +26,7 @@ const AppRouter = () => {
         <BrowserRouter>
             <Routes>
                 <Route path="/login" element={!usuario ? <LoginPage /> : <Navigate to={usuario.rol === 'ADMIN' ? '/admin' : '/estudiante'} replace />} />
+                <Route path="/registro" element={!usuario ? <RegistroPage /> : <Navigate to={usuario.rol === 'ADMIN' ? '/admin' : '/estudiante'} replace />} />
 
                 {/* Estudiante */}
                 <Route path="/estudiante" element={<ProtectedRoute rolRequerido="ESTUDIANTE"><DashboardEstudiante /></ProtectedRoute>} />
@@ -43,7 +44,6 @@ const AppRouter = () => {
                 <Route path="/admin/reportes" element={<ProtectedRoute rolRequerido="ADMIN"><ReportesPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<Navigate to="/login" replace />} />
-                <Route path="/registro" element={!usuario ? <RegistroPage /> : <Navigate to={usuario.rol === 'ADMIN' ? '/admin' : '/estudiante'} replace />} />
             </Routes>
         </BrowserRouter>
     );

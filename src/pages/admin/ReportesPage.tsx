@@ -3,6 +3,7 @@ import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatearCalificacion, limitarCalificacion } from '../../utils/calificacion';
 import './Admin.css';
 
 interface ExamenResumen { id: string; titulo: string; categoria: { nombre: string }; }
@@ -82,7 +83,7 @@ const ReportesPage = () => {
                 : intento.examen?.categoria.nombre ?? '—',
             intento.entregado_en ? new Date(intento.entregado_en).toLocaleDateString() : '—',
             intento.estado === 'CALIFICADO'
-                ? String(intento.calificacion_final)
+                ? String(limitarCalificacion(intento.calificacion_final))
                 : 'En revisión',
         ]);
 
@@ -219,7 +220,7 @@ const ReportesPage = () => {
                                                     </td>
                                                     <td>
                                                         {intento.estado === 'CALIFICADO'
-                                                            ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.05rem' }}>{intento.calificacion_final} / 100</span>
+                                                            ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.05rem' }}>{formatearCalificacion(intento.calificacion_final)}</span>
                                                             : <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>En revisión</span>
                                                         }
                                                     </td>

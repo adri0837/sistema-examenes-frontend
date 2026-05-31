@@ -7,7 +7,7 @@ interface RespuestaAbierta {
     id: string;
     texto_respuesta: string;
     revisado_por_admin: boolean;
-    pregunta: { enunciado: string; puntaje: number; };
+    pregunta: { enunciado: string; puntaje: number | string; };
 }
 
 interface Intento {
@@ -17,6 +17,8 @@ interface Intento {
     entregado_en: string;
     respuestas: RespuestaAbierta[];
 }
+
+const puntajeMaximoPregunta = (puntaje: number | string) => Number(puntaje);
 
 const RevisionPage = () => {
     const [pendientes, setPendientes] = useState<Intento[]>([]);
@@ -38,12 +40,39 @@ const RevisionPage = () => {
 
     useEffect(() => { cargarPendientes(); }, []);
 
-    const handleCalificar = async (respuesta_id: string) => {
+    const handlePuntajeChange = (respuestaId: string, value: string, maxPuntaje: number) => {
+        if (value === '') {
+            setPuntajes(prev => ({ ...prev, [respuestaId]: '' }));
+            return;
+        }
+        const num = Number(value);
+        if (Number.isNaN(num)) return;
+        const limitado = Math.min(Math.max(0, num), maxPuntaje);
+        setPuntajes(prev => ({ ...prev, [respuestaId]: String(limitado) }));
+    };
+
+    const handleCalificar = async (respuesta_id: string, maxPuntaje: number) => {
+        const raw = puntajes[respuesta_id];
+        if (raw === undefined || raw === '') {
+            setError('Ingresa un puntaje antes de guardar');
+            return;
+        }
+        const puntaje = Math.min(Math.max(0, Number(raw)), maxPuntaje);
+        if (Number.isNaN(puntaje)) {
+            setError('El puntaje ingresado no es válido');
+            return;
+        }
         try {
             setError('');
-            await api.patch(`/revision/respuestas/${respuesta_id}`, { puntaje_obtenido: Number(puntajes[respuesta_id]) });
+            await api.patch(`/revision/respuestas/${respuesta_id}`, { puntaje_obtenido: puntaje });
+            setPuntajes(prev => {
+                const next = { ...prev };
+                delete next[respuesta_id];
+                return next;
+            });
             cargarPendientes();
-        } catch (e: any) {
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } } };
             setError(e.response?.data?.message || 'Error al calificar respuesta');
         }
     };
@@ -83,24 +112,38 @@ const RevisionPage = () => {
 
                                     {expandido === intento.id && (
                                         <div style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.02)' }}>
-                                            {intento.respuestas.map(ra => (
-                                                <div key={ra.id} style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', padding: '1.5rem', marginBottom: '1rem', background: 'rgba(15, 23, 42, 0.4)' }}>
-                                                    <p style={{ fontWeight: '600', fontSize: '15px', margin: '0 0 0.8rem', color: '#e2e8f0' }}><span style={{ color: '#a8c0ff' }}>Pregunta:</span> {ra.pregunta.enunciado}</p>
-                                                    <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '1rem', borderRadius: '6px', fontSize: '14.5px', marginBottom: '1rem', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.05)', minHeight: '60px' }}>
-                                                        {ra.texto_respuesta || <em style={{ color: '#64748b' }}>El estudiante no escribió ninguna respuesta.</em>}
+                                            {intento.respuestas.map(ra => {
+                                                const maxPuntaje = puntajeMaximoPregunta(ra.pregunta.puntaje);
+                                                return (
+                                                    <div key={ra.id} style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', padding: '1.5rem', marginBottom: '1rem', background: 'rgba(15, 23, 42, 0.4)' }}>
+                                                        <p style={{ fontWeight: '600', fontSize: '15px', margin: '0 0 0.8rem', color: '#e2e8f0' }}><span style={{ color: '#a8c0ff' }}>Pregunta:</span> {ra.pregunta.enunciado}</p>
+                                                        <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '1rem', borderRadius: '6px', fontSize: '14.5px', marginBottom: '1rem', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.05)', minHeight: '60px' }}>
+                                                            {ra.texto_respuesta || <em style={{ color: '#64748b' }}>El estudiante no escribió ninguna respuesta.</em>}
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '8px', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                                                            <label style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 500 }}>Puntaje (máximo {maxPuntaje}):</label>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                max={maxPuntaje}
+                                                                step="0.01"
+                                                                value={puntajes[ra.id] ?? ''}
+                                                                onChange={e => handlePuntajeChange(ra.id, e.target.value, maxPuntaje)}
+                                                                onBlur={() => {
+                                                                    const val = puntajes[ra.id];
+                                                                    if (val !== undefined && val !== '') {
+                                                                        handlePuntajeChange(ra.id, val, maxPuntaje);
+                                                                    }
+                                                                }}
+                                                                style={{ padding: '0.5rem 0.8rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(168, 192, 255, 0.3)', borderRadius: '6px', fontSize: '14px', width: '90px', color: 'white' }}
+                                                            />
+                                                            <button onClick={() => handleCalificar(ra.id, maxPuntaje)} className="btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '13px' }}>
+                                                                Guardar Calificación
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '8px', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
-                                                        <label style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 500 }}>Puntaje (máximo {ra.pregunta.puntaje}):</label>
-                                                        <input type="number" min={0} max={ra.pregunta.puntaje}
-                                                            value={puntajes[ra.id] || ''}
-                                                            onChange={e => setPuntajes(prev => ({ ...prev, [ra.id]: e.target.value }))}
-                                                            style={{ padding: '0.5rem 0.8rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(168, 192, 255, 0.3)', borderRadius: '6px', fontSize: '14px', width: '90px', color: 'white' }} />
-                                                        <button onClick={() => handleCalificar(ra.id)} className="btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '13px' }}>
-                                                            Guardar Calificación
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
