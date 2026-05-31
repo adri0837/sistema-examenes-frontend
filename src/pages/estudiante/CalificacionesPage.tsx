@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
+import { formatearCalificacion } from '../../utils/calificacion';
 import '../admin/Admin.css';
 
 interface Intento {
@@ -71,7 +72,7 @@ const CalificacionesPage = () => {
                                             <td style={{ color: '#94a3b8' }}>{new Date(item.entregado_en).toLocaleDateString()} a las {new Date(item.entregado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                                             <td>
                                                 {item.estado === 'CALIFICADO'
-                                                    ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.2rem' }}>{item.calificacion_final} / 100</span>
+                                                    ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.2rem' }}>{formatearCalificacion(item.calificacion_final)}</span>
                                                     : <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>En revisión</span>
                                                 }
                                             </td>
