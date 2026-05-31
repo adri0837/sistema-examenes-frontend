@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
+import type { TipoPregunta, RespuestaEntrega } from '../../types';
 import '../admin/Admin.css';
-
-type TipoPregunta = 'OPCION_MULTIPLE' | 'VERDADERO_FALSO' | 'ABIERTA' | 'RELACIONAR' | 'COMPLETAR';
 
 interface Opcion { id: string; texto: string; orden: number; }
 interface Par { id: string; lado_izquierdo: string; lado_derecho: string; }
@@ -13,19 +12,20 @@ interface Pregunta {
     id: string; orden: number; enunciado: string; tipo: TipoPregunta; puntaje: number;
     opciones: Opcion[]; pares: Par[]; espacios: Espacio[];
 }
-interface Examen { titulo: string; tiempo_limite_min: number | null; }
+interface Examen { id: string; titulo: string; tiempo_limite_min: number | null; }
 
 const ResponderExamenPage = () => {
     const { id: intento_id } = useParams();
     const navigate = useNavigate();
     const [examen, setExamen] = useState<Examen | null>(null);
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
-    const [respuestas, setRespuestas] = useState<Record<string, any>>({});
+    const [respuestas, setRespuestas] = useState<Record<string, Partial<RespuestaEntrega>>>({});
     const [entregado, setEntregado] = useState(false);
+    const [entregando, setEntregando] = useState(false);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
     const [segundos, setSegundos] = useState<number | null>(null);
-    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const entregandoRef = useRef(false);
 
     useEffect(() => {
         const cargar = async () => {
@@ -36,8 +36,11 @@ const ResponderExamenPage = () => {
                 if (data.examen.tiempo_limite_min) {
                     setSegundos(data.examen.tiempo_limite_min * 60);
                 }
+                if (data.examen?.id) {
+                    localStorage.setItem(`intento_${data.examen.id}`, data.intento.id);
+                }
             } catch {
-                setError('Error al cargar el examen');
+                setError('Error al cargar el examen. Puede que ya haya sido entregado.');
             } finally {
                 setCargando(false);
             }
@@ -46,11 +49,67 @@ const ResponderExamenPage = () => {
     }, [intento_id]);
 
     useEffect(() => {
-        if (segundos === null) return;
-        if (segundos <= 0) { handleEntregar(); return; }
-        timerRef.current = setInterval(() => setSegundos(s => (s !== null ? s - 1 : null)), 1000);
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [segundos]);
+        if (segundos === null || segundos <= 0 || entregado || entregando || cargando) return;
+        const timer = setInterval(() => {
+            setSegundos(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [cargando, entregado, entregando]);
+
+    const handleEntregar = useCallback(async (forzar = false) => {
+        if (entregandoRef.current || entregado) return;
+
+        if (!forzar) {
+            const sinResponder = preguntas.filter(p => {
+                const r = respuestas[p.id];
+                if (!r) return true;
+                if (p.tipo === 'ABIERTA') return !r.texto_respuesta?.trim();
+                if (p.tipo === 'OPCION_MULTIPLE' || p.tipo === 'VERDADERO_FALSO') {
+                    return !r.opciones_seleccionadas?.length;
+                }
+                if (p.tipo === 'RELACIONAR') {
+                    return !r.pares_relacionados?.length || r.pares_relacionados.some(p => !p.derecho);
+                }
+                if (p.tipo === 'COMPLETAR') {
+                    return !r.espacios_respuestas?.length || r.espacios_respuestas.some(e => !e?.trim());
+                }
+                return true;
+            });
+
+            if (sinResponder.length > 0) {
+                const confirmar = window.confirm(
+                    `Tienes ${sinResponder.length} pregunta(s) sin responder. ¿Deseas entregar el examen de todas formas?`
+                );
+                if (!confirmar) return;
+            } else {
+                const confirmar = window.confirm('¿Estás seguro de que deseas entregar el examen? No podrás modificar tus respuestas.');
+                if (!confirmar) return;
+            }
+        }
+
+        entregandoRef.current = true;
+        setEntregando(true);
+        try {
+            const payload: RespuestaEntrega[] = preguntas.map(p => ({
+                pregunta_id: p.id,
+                ...respuestas[p.id],
+            }));
+            await api.post(`/estudiante/intentos/${intento_id}/entregar`, { respuestas: payload });
+            if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
+            setEntregado(true);
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } } };
+            setError(e.response?.data?.message || 'Error al entregar el examen');
+            entregandoRef.current = false;
+            setEntregando(false);
+        }
+    }, [entregado, preguntas, respuestas, intento_id, examen?.id]);
+
+    useEffect(() => {
+        if (segundos === 0 && !entregado && !entregando && !cargando && preguntas.length > 0) {
+            handleEntregar(true);
+        }
+    }, [segundos, entregado, entregando, cargando, preguntas.length, handleEntregar]);
 
     const formatTiempo = (s: number) => {
         const m = Math.floor(s / 60);
@@ -58,7 +117,17 @@ const ResponderExamenPage = () => {
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    const handleOpcion = (pregunta_id: string, opcion_id: string) => {
+    const handleOpcionMultiple = (pregunta_id: string, opcion_id: string, checked: boolean) => {
+        setRespuestas(prev => {
+            const actuales = prev[pregunta_id]?.opciones_seleccionadas || [];
+            const nuevas = checked
+                ? [...actuales, opcion_id]
+                : actuales.filter(id => id !== opcion_id);
+            return { ...prev, [pregunta_id]: { opciones_seleccionadas: nuevas } };
+        });
+    };
+
+    const handleVerdaderoFalso = (pregunta_id: string, opcion_id: string) => {
         setRespuestas(prev => ({ ...prev, [pregunta_id]: { opciones_seleccionadas: [opcion_id] } }));
     };
 
@@ -84,20 +153,6 @@ const ResponderExamenPage = () => {
         });
     };
 
-    const handleEntregar = async () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        try {
-            const payload = preguntas.map(p => ({
-                pregunta_id: p.id,
-                ...respuestas[p.id],
-            }));
-            await api.post(`/estudiante/intentos/${intento_id}/entregar`, { respuestas: payload });
-            setEntregado(true);
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al entregar el examen');
-        }
-    };
-
     if (entregado) {
         return (
             <div className="admin-layout">
@@ -108,7 +163,7 @@ const ResponderExamenPage = () => {
                             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
                             <h2 style={{ fontSize: '2rem', color: '#f8fafc', marginBottom: '1rem' }}>Examen Entregado</h2>
                             <p style={{ color: '#94a3b8', fontSize: '1.1rem', marginBottom: '2rem' }}>
-                                Tu examen fue enviado correctamente. Podrás ver tu calificación una vez que sea revisado por tu profesor.
+                                Tu examen fue enviado correctamente. Podrás ver tu calificación cuando sea liberada.
                             </p>
                             <button onClick={() => navigate('/estudiante/calificaciones')} className="btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }}>
                                 Ver mis calificaciones
@@ -120,16 +175,18 @@ const ResponderExamenPage = () => {
         );
     }
 
-    if (cargando) return (
-        <div className="admin-layout">
-            <div className="admin-content-wrapper">
-                <NavbarEstudiante />
-                <div className="admin-page-container">
-                    <p style={{ color: '#94a3b8', textAlign: 'center', padding: '3rem' }}>Cargando examen...</p>
+    if (cargando) {
+        return (
+            <div className="admin-layout">
+                <div className="admin-content-wrapper">
+                    <NavbarEstudiante />
+                    <div className="admin-page-container">
+                        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '3rem' }}>Cargando examen...</p>
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    }
 
     return (
         <div className="admin-layout">
@@ -139,9 +196,9 @@ const ResponderExamenPage = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.8)', padding: '1.5rem 2rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '2rem', backdropFilter: 'blur(10px)', position: 'sticky', top: '1rem', zIndex: 10 }}>
                         <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#f8fafc' }}>{examen?.titulo}</h2>
                         {segundos !== null && (
-                            <span style={{ 
-                                color: segundos < 60 ? '#f87171' : '#4ade80', 
-                                fontWeight: 'bold', 
+                            <span style={{
+                                color: segundos < 60 ? '#f87171' : '#4ade80',
+                                fontWeight: 'bold',
                                 fontSize: '1.25rem',
                                 background: 'rgba(0,0,0,0.3)',
                                 padding: '0.5rem 1rem',
@@ -166,26 +223,53 @@ const ResponderExamenPage = () => {
                                         {pregunta.puntaje} pts
                                     </span>
                                 </div>
-                                
+
                                 <p style={{ margin: '0 0 1.5rem', fontSize: '1.2rem', color: '#f1f5f9', lineHeight: '1.6' }}>{pregunta.enunciado}</p>
 
-                                {(pregunta.tipo === 'OPCION_MULTIPLE' || pregunta.tipo === 'VERDADERO_FALSO') && (
+                                {pregunta.tipo === 'OPCION_MULTIPLE' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: '0 0 0.5rem' }}>Selecciona una o más opciones</p>
+                                        {pregunta.opciones.map(opcion => {
+                                            const seleccionadas = respuestas[pregunta.id]?.opciones_seleccionadas || [];
+                                            const isSelected = seleccionadas.includes(opcion.id);
+                                            return (
+                                                <label key={opcion.id} style={{
+                                                    display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', fontSize: '1.05rem',
+                                                    background: isSelected ? 'rgba(83, 74, 183, 0.4)' : 'rgba(15, 23, 42, 0.4)',
+                                                    padding: '1rem', borderRadius: '8px',
+                                                    border: isSelected ? '1px solid rgba(168, 192, 255, 0.5)' : '1px solid rgba(255,255,255,0.05)',
+                                                    color: isSelected ? '#fff' : '#cbd5e1'
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={e => handleOpcionMultiple(pregunta.id, opcion.id, e.target.checked)}
+                                                        style={{ transform: 'scale(1.2)' }}
+                                                    />
+                                                    {opcion.texto}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {pregunta.tipo === 'VERDADERO_FALSO' && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                                         {pregunta.opciones.map(opcion => {
                                             const isSelected = respuestas[pregunta.id]?.opciones_seleccionadas?.[0] === opcion.id;
                                             return (
-                                                <label key={opcion.id} style={{ 
+                                                <label key={opcion.id} style={{
                                                     display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', fontSize: '1.05rem',
                                                     background: isSelected ? 'rgba(83, 74, 183, 0.4)' : 'rgba(15, 23, 42, 0.4)',
-                                                    padding: '1rem',
-                                                    borderRadius: '8px',
+                                                    padding: '1rem', borderRadius: '8px',
                                                     border: isSelected ? '1px solid rgba(168, 192, 255, 0.5)' : '1px solid rgba(255,255,255,0.05)',
-                                                    transition: 'all 0.2s',
                                                     color: isSelected ? '#fff' : '#cbd5e1'
                                                 }}>
-                                                    <input type="radio" name={pregunta.id} value={opcion.id}
+                                                    <input
+                                                        type="radio"
+                                                        name={pregunta.id}
                                                         checked={isSelected}
-                                                        onChange={() => handleOpcion(pregunta.id, opcion.id)} 
+                                                        onChange={() => handleVerdaderoFalso(pregunta.id, opcion.id)}
                                                         style={{ transform: 'scale(1.2)' }}
                                                     />
                                                     {opcion.texto}
@@ -199,8 +283,8 @@ const ResponderExamenPage = () => {
                                     <textarea rows={5} placeholder="Escribe tu respuesta detallada aquí..."
                                         value={respuestas[pregunta.id]?.texto_respuesta || ''}
                                         onChange={e => handleTexto(pregunta.id, e.target.value)}
-                                        style={{ 
-                                            width: '100%', padding: '1rem', fontSize: '1.05rem', borderRadius: '8px', 
+                                        style={{
+                                            width: '100%', padding: '1rem', fontSize: '1.05rem', borderRadius: '8px',
                                             border: '1px solid rgba(255,255,255,0.1)', resize: 'vertical', boxSizing: 'border-box',
                                             background: 'rgba(15, 23, 42, 0.6)', color: 'white', fontFamily: 'inherit'
                                         }} />
@@ -212,7 +296,9 @@ const ResponderExamenPage = () => {
                                             <div key={par.id} style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(15, 23, 42, 0.4)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                                 <span style={{ fontSize: '1.05rem', minWidth: '150px', color: '#e2e8f0' }}>{par.lado_izquierdo}</span>
                                                 <span style={{ color: '#64748b' }}>➜</span>
-                                                <select onChange={e => handlePar(pregunta.id, par.lado_izquierdo, e.target.value, i)}
+                                                <select
+                                                    value={respuestas[pregunta.id]?.pares_relacionados?.[i]?.derecho || ''}
+                                                    onChange={e => handlePar(pregunta.id, par.lado_izquierdo, e.target.value, i)}
                                                     style={{ padding: '0.6rem 1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '1rem', background: 'rgba(30, 41, 59, 0.8)', color: 'white', flex: 1 }}>
                                                     <option value="" style={{ color: 'black' }}>Seleccionar respuesta...</option>
                                                     {pregunta.pares.map(p => <option key={p.id} value={p.lado_derecho} style={{ color: 'black' }}>{p.lado_derecho}</option>)}
@@ -239,9 +325,12 @@ const ResponderExamenPage = () => {
                         ))}
                     </div>
 
-                    <button onClick={handleEntregar} className="action-btn btn-success"
-                        style={{ marginTop: '3rem', marginBottom: '3rem', padding: '1.2rem', fontSize: '1.2rem', width: '100%', fontWeight: 'bold', letterSpacing: '1px', textTransform: 'uppercase', borderRadius: '12px', boxShadow: '0 10px 25px rgba(34, 197, 94, 0.3)' }}>
-                        Finalizar y Entregar Examen
+                    <button
+                        onClick={() => handleEntregar()}
+                        disabled={entregando}
+                        className="action-btn btn-success"
+                        style={{ marginTop: '3rem', marginBottom: '3rem', padding: '1.2rem', fontSize: '1.2rem', width: '100%', fontWeight: 'bold', letterSpacing: '1px', textTransform: 'uppercase', borderRadius: '12px', opacity: entregando ? 0.6 : 1 }}>
+                        {entregando ? 'Entregando...' : 'Finalizar y Entregar Examen'}
                     </button>
                 </div>
             </div>

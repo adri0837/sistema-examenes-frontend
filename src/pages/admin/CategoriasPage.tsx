@@ -58,6 +58,7 @@ const CategoriasPage = () => {
     };
 
     const handleEliminar = async (id: string) => {
+        if (!window.confirm('¿Eliminar esta categoría?')) return;
         try {
             setError('');
             await api.delete(`/categorias/${id}`);

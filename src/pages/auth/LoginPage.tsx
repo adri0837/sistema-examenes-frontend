@@ -10,15 +10,25 @@ const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [cargando, setCargando] = useState(false);
 
-    const handleLogin = async () => {
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email.trim() || !password) {
+            setError('Ingresa tu correo y contraseña');
+            return;
+        }
         try {
+            setCargando(true);
             setError('');
             const { data } = await api.post('/auth/login', { email, password });
             login(data.usuario, data.token);
             navigate(data.usuario.rol === 'ADMIN' ? '/admin' : '/estudiante');
-        } catch (e: any) {
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { message?: string } } };
             setError(e.response?.data?.message || 'Error al iniciar sesión');
+        } finally {
+            setCargando(false);
         }
     };
 
@@ -29,33 +39,37 @@ const LoginPage = () => {
                     <h2>Sistema de Exámenes</h2>
                     <p>Inicia sesión para continuar</p>
                 </div>
-                
-                <div className="input-group">
-                    <label>Correo Electrónico</label>
-                    <input 
-                        type="email" 
-                        placeholder="tu@email.com" 
-                        value={email} 
-                        onChange={e => setEmail(e.target.value)} 
-                    />
-                </div>
-                
-                <div className="input-group">
-                    <label>Contraseña</label>
-                    <input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        value={password} 
-                        onChange={e => setPassword(e.target.value)} 
-                    />
-                </div>
-                
-                {error && <p className="error-message">{error}</p>}
-                
-                <button onClick={handleLogin} className="btn-submit">
-                    Entrar a la Plataforma
-                </button>
-                
+
+                <form onSubmit={handleLogin}>
+                    <div className="input-group">
+                        <label>Correo Electrónico</label>
+                        <input
+                            type="email"
+                            placeholder="tu@email.com"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            autoComplete="email"
+                        />
+                    </div>
+
+                    <div className="input-group">
+                        <label>Contraseña</label>
+                        <input
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            autoComplete="current-password"
+                        />
+                    </div>
+
+                    {error && <p className="error-message">{error}</p>}
+
+                    <button type="submit" className="btn-submit" disabled={cargando}>
+                        {cargando ? 'Ingresando...' : 'Entrar a la Plataforma'}
+                    </button>
+                </form>
+
                 <p className="login-footer">
                     ¿No tienes cuenta? <Link to="/registro">Regístrate como estudiante</Link>
                 </p>

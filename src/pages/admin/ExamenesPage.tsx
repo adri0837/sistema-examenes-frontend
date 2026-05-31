@@ -65,6 +65,7 @@ const ExamenesPage = () => {
     };
 
     const handleEliminar = async (id: string) => {
+        if (!window.confirm('¿Eliminar este examen y todas sus preguntas?')) return;
         try {
             setError('');
             await api.delete(`/examenes/${id}`);
