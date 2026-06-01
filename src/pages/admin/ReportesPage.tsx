@@ -12,7 +12,7 @@ interface IntentoReporte {
     id: string; estado: string; calificacion_final: number | null;
     iniciado_en: string; entregado_en: string;
     estudiante?: { id: string; nombre: string; email: string; };
-    examen?: { titulo: string; descripcion: string | null; categoria: { nombre: string }; };
+    examen?: { id: string; titulo: string; descripcion: string | null; categoria: { nombre: string }; };
 }
 
 const ReportesPage = () => {
@@ -242,7 +242,10 @@ const ReportesPage = () => {
                                                     {tipoReporte === 'examen' && (
                                                         <td>
                                                             <button
-                                                                onClick={() => darOportunidad(intento.estudiante?.id ?? '', examenSeleccionado)}
+                                                                onClick={() => darOportunidad(
+                                                                    intento.estudiante?.id || estudianteSeleccionado,
+                                                                    intento.examen?.id || examenSeleccionado
+                                                                )}
                                                                 className="action-btn"
                                                                 style={{ fontSize: '0.8rem' }}>
                                                                 Nueva oportunidad
