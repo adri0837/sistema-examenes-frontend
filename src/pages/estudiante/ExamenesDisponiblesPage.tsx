@@ -61,21 +61,9 @@ const ExamenesDisponiblesPage = () => {
     };
 
     const renderEstado = (estado: ReturnType<typeof getEstadoExamen>) => {
-        if (estado === 'completado') {
-            return <span className="badge badge-active">Completado</span>;
-        }
-        if (estado === 'en_progreso') {
-            return (
-                <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
-                    En progreso
-                </span>
-            );
-        }
-        return (
-            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-                Disponible
-            </span>
-        );
+        if (estado === 'completado') return <span className="badge badge-active">Completado</span>;
+        if (estado === 'en_progreso') return <span className="badge badge-warning">En progreso</span>;
+        return <span className="badge badge-info">Disponible</span>;
     };
 
     const renderAccion = (examen: ExamenDisponible, estado: ReturnType<typeof getEstadoExamen>) => {
@@ -104,9 +92,9 @@ const ExamenesDisponiblesPage = () => {
                     <div className="admin-header-flex">
                         <h2>Exámenes Disponibles</h2>
                     </div>
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>{error}</p>}
 
-                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando exámenes...</p> : examenes.length === 0 ? (
+                    {cargando ? <p style={{ color: '#6b7280' }}>Cargando exámenes...</p> : examenes.length === 0 ? (
                         <div className="admin-table-container" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                             <p>No hay exámenes publicados disponibles por el momento.</p>
                         </div>
@@ -132,7 +120,7 @@ const ExamenesDisponiblesPage = () => {
                                                 <td style={{ fontWeight: 500 }}>{examen.titulo}</td>
                                                 <td style={{ color: '#94a3b8' }}>{examen.descripcion || '—'}</td>
                                                 <td>
-                                                    <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
+                                                    <span className="badge badge-info">
                                                         {examen.categoria.nombre}
                                                     </span>
                                                 </td>

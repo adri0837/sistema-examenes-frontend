@@ -97,7 +97,6 @@ const ExamenesPage = () => {
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarAdmin />
-                
                 <div className="admin-page-container">
                     <div className="admin-header-flex">
                         <h2>Gestión de Exámenes</h2>
@@ -106,7 +105,11 @@ const ExamenesPage = () => {
                         </button>
                     </div>
 
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && (
+                        <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                            {error}
+                        </p>
+                    )}
 
                     {(mostrarForm || editando) && (
                         <div className="admin-form-card">
@@ -120,30 +123,27 @@ const ExamenesPage = () => {
                             </div>
                             <div className="admin-form-group">
                                 <label>Categoría</label>
-                                <select value={categoria_id} onChange={e => setCategoriaId(e.target.value)}
-                                    style={{ padding: '0.7rem 1rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: 'white', fontSize: '0.95rem' }}>
-                                    <option value="" style={{ color: '#000' }}>Seleccionar...</option>
-                                    {categorias.map(c => <option key={c.id} value={c.id} style={{ color: '#000' }}>{c.nombre}</option>)}
+                                <select value={categoria_id} onChange={e => setCategoriaId(e.target.value)}>
+                                    <option value="">Seleccionar...</option>
+                                    {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                 </select>
                             </div>
-                            <div className="admin-form-group" style={{ minWidth: '150px' }}>
+                            <div className="admin-form-group">
                                 <label>Tiempo límite (min)</label>
-                                <input type="number" placeholder="Sin límite" value={tiempo} onChange={e => setTiempo(e.target.value)} />
+                                <input type="number" placeholder="Dejar vacío = sin límite" value={tiempo} onChange={e => setTiempo(e.target.value)} style={{ maxWidth: '220px' }} />
                             </div>
-                            <div style={{ paddingBottom: '2px', display: 'flex', gap: '0.8rem' }}>
-                                <button onClick={editando ? handleEditar : handleCrear} className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button onClick={editando ? handleEditar : handleCrear} className="btn-primary">
                                     {editando ? 'Guardar cambios' : 'Crear examen'}
                                 </button>
                                 {editando && (
-                                    <button onClick={limpiarForm} className="action-btn" style={{ padding: '0.75rem 1.5rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                        Cancelar
-                                    </button>
+                                    <button onClick={limpiarForm} className="action-btn">Cancelar</button>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando exámenes...</p> : (
+                    {cargando ? <p style={{ color: '#6b7280' }}>Cargando exámenes...</p> : (
                         <div className="admin-table-container">
                             <table className="admin-table">
                                 <thead>
@@ -160,42 +160,41 @@ const ExamenesPage = () => {
                                 <tbody>
                                     {examenes.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} style={{ textAlign: 'center', color: '#64748b', padding: '3rem' }}>
-                                                No hay exámenes registrados en el sistema.
+                                            <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                                No hay exámenes registrados
                                             </td>
                                         </tr>
                                     ) : (
                                         examenes.map(ex => (
                                             <tr key={ex.id}>
                                                 <td style={{ fontWeight: 500 }}>{ex.titulo}</td>
-                                                <td style={{ color: '#94a3b8' }}>{ex.descripcion || '—'}</td>
+                                                <td style={{ color: '#6b7280' }}>{ex.descripcion || '—'}</td>
                                                 <td>
-                                                    <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
-                                                        {ex.categoria.nombre}
-                                                    </span>
+                                                    <span className="badge badge-info">{ex.categoria.nombre}</span>
                                                 </td>
-                                                <td>{ex.tiempo_limite_min ? `${ex.tiempo_limite_min} min` : 'Sin límite'}</td>
+                                                <td style={{ color: '#6b7280' }}>{ex.tiempo_limite_min ? `${ex.tiempo_limite_min} min` : 'Sin límite'}</td>
                                                 <td>
                                                     <span className={`badge ${ex.publicado ? 'badge-active' : 'badge-inactive'}`}>
                                                         {ex.publicado ? 'Publicado' : 'Borrador'}
                                                     </span>
                                                 </td>
-                                                <td style={{ textAlign: 'center' }}>{ex._count.intentos}</td>
+                                                <td style={{ textAlign: 'center', color: '#6b7280' }}>{ex._count.intentos}</td>
                                                 <td style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                    <button onClick={() => navigate(`/admin/examenes/${ex.id}`)}
-                                                        className="btn-primary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.8rem' }}>
+                                                    <button onClick={() => navigate(`/admin/examenes/${ex.id}`)} className="btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}>
                                                         Preguntas
                                                     </button>
                                                     <button onClick={() => iniciarEdicion(ex)} disabled={ex._count.intentos > 0}
-                                                        className="action-btn" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', opacity: ex._count.intentos > 0 ? 0.3 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                        className="action-btn"
+                                                        style={{ opacity: ex._count.intentos > 0 ? 0.4 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
                                                         Editar
                                                     </button>
                                                     <button onClick={() => handleEliminar(ex.id)} disabled={ex._count.intentos > 0}
-                                                        className="action-btn btn-danger" style={{ opacity: ex._count.intentos > 0 ? 0.3 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                        className="action-btn btn-danger"
+                                                        style={{ opacity: ex._count.intentos > 0 ? 0.4 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
                                                         Eliminar
                                                     </button>
                                                     <button onClick={() => handleTogglePublicado(ex.id)}
-                                                        className={`action-btn ${ex.publicado ? 'btn-danger' : 'btn-success'}`} style={{ background: ex.publicado ? 'rgba(156, 163, 175, 0.2)' : '', color: ex.publicado ? '#9ca3af' : '' }}>
+                                                        className={`action-btn ${ex.publicado ? '' : 'btn-success'}`}>
                                                         {ex.publicado ? 'Despublicar' : 'Publicar'}
                                                     </button>
                                                 </td>

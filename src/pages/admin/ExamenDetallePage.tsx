@@ -21,15 +21,6 @@ const etiquetaTipo: Record<TipoPregunta, string> = {
     COMPLETAR: 'Completar espacios',
 };
 
-const formInicial = {
-    enunciado: '',
-    tipo: 'OPCION_MULTIPLE' as TipoPregunta,
-    puntaje: '',
-    opciones: [{ texto: '', es_correcta: false }, { texto: '', es_correcta: false }] as Opcion[],
-    pares: [{ lado_izquierdo: '', lado_derecho: '' }] as Par[],
-    espacios: [{ respuesta_correcta: '' }] as Espacio[],
-};
-
 const ExamenDetallePage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -38,12 +29,12 @@ const ExamenDetallePage = () => {
     const [error, setError] = useState('');
     const [mostrarForm, setMostrarForm] = useState(false);
     const [editandoId, setEditandoId] = useState<string | null>(null);
-    const [enunciado, setEnunciado] = useState(formInicial.enunciado);
-    const [tipo, setTipo] = useState<TipoPregunta>(formInicial.tipo);
-    const [puntaje, setPuntaje] = useState(formInicial.puntaje);
-    const [opciones, setOpciones] = useState<Opcion[]>(formInicial.opciones);
-    const [pares, setPares] = useState<Par[]>(formInicial.pares);
-    const [espacios, setEspacios] = useState<Espacio[]>(formInicial.espacios);
+    const [enunciado, setEnunciado] = useState('');
+    const [tipo, setTipo] = useState<TipoPregunta>('OPCION_MULTIPLE');
+    const [puntaje, setPuntaje] = useState('');
+    const [opciones, setOpciones] = useState<Opcion[]>([{ texto: '', es_correcta: false }, { texto: '', es_correcta: false }]);
+    const [pares, setPares] = useState<Par[]>([{ lado_izquierdo: '', lado_derecho: '' }]);
+    const [espacios, setEspacios] = useState<Espacio[]>([{ respuesta_correcta: '' }]);
 
     const cargarPreguntas = async () => {
         if (!id) return;
@@ -60,15 +51,11 @@ const ExamenDetallePage = () => {
     useEffect(() => { cargarPreguntas(); }, [id]);
 
     const limpiarForm = () => {
-        setEditandoId(null);
-        setEnunciado('');
-        setTipo('OPCION_MULTIPLE');
-        setPuntaje('');
+        setEditandoId(null); setEnunciado(''); setTipo('OPCION_MULTIPLE'); setPuntaje('');
         setOpciones([{ texto: '', es_correcta: false }, { texto: '', es_correcta: false }]);
         setPares([{ lado_izquierdo: '', lado_derecho: '' }]);
         setEspacios([{ respuesta_correcta: '' }]);
-        setMostrarForm(false);
-        setError('');
+        setMostrarForm(false); setError('');
     };
 
     const validarForm = (): string | null => {
@@ -78,21 +65,14 @@ const ExamenDetallePage = () => {
             if (opciones.some(o => !o.texto.trim())) return 'Todas las opciones deben tener texto';
             if (!opciones.some(o => o.es_correcta)) return 'Marca al menos una opción como correcta';
         }
-        if (tipo === 'VERDADERO_FALSO' && !opciones.some(o => o.es_correcta)) {
-            return 'Marca la respuesta correcta (Verdadero o Falso)';
-        }
-        if (tipo === 'RELACIONAR' && pares.some(p => !p.lado_izquierdo.trim() || !p.lado_derecho.trim())) {
-            return 'Todos los pares deben estar completos';
-        }
-        if (tipo === 'COMPLETAR' && espacios.some(e => !e.respuesta_correcta.trim())) {
-            return 'Completa todas las respuestas de los espacios';
-        }
+        if (tipo === 'VERDADERO_FALSO' && !opciones.some(o => o.es_correcta)) return 'Marca la respuesta correcta';
+        if (tipo === 'RELACIONAR' && pares.some(p => !p.lado_izquierdo.trim() || !p.lado_derecho.trim())) return 'Todos los pares deben estar completos';
+        if (tipo === 'COMPLETAR' && espacios.some(e => !e.respuesta_correcta.trim())) return 'Completa todas las respuestas';
         return null;
     };
 
     const handleCrear = async () => {
-        const validacion = validarForm();
-        if (validacion) { setError(validacion); return; }
+        const v = validarForm(); if (v) { setError(v); return; }
         try {
             setError('');
             await api.post(`/examenes/${id}/preguntas`, {
@@ -101,17 +81,14 @@ const ExamenDetallePage = () => {
                 pares: tipo === 'RELACIONAR' ? pares : undefined,
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
             });
-            limpiarForm();
-            cargarPreguntas();
-        } catch (err: unknown) {
-            const e = err as { response?: { data?: { message?: string } } };
+            limpiarForm(); cargarPreguntas();
+        } catch (e: any) {
             setError(e.response?.data?.message || 'Error al crear pregunta');
         }
     };
 
     const handleEditar = async () => {
-        const validacion = validarForm();
-        if (validacion) { setError(validacion); return; }
+        const v = validarForm(); if (v) { setError(v); return; }
         try {
             setError('');
             await api.put(`/preguntas/${editandoId}`, {
@@ -120,24 +97,18 @@ const ExamenDetallePage = () => {
                 pares: tipo === 'RELACIONAR' ? pares : undefined,
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
             });
-            limpiarForm();
-            cargarPreguntas();
-        } catch (err: unknown) {
-            const e = err as { response?: { data?: { message?: string } } };
+            limpiarForm(); cargarPreguntas();
+        } catch (e: any) {
             setError(e.response?.data?.message || 'Error al editar pregunta');
         }
     };
 
     const iniciarEdicion = (p: Pregunta) => {
-        setEditandoId(p.id);
-        setEnunciado(p.enunciado);
-        setTipo(p.tipo);
-        setPuntaje(String(p.puntaje));
+        setEditandoId(p.id); setEnunciado(p.enunciado); setTipo(p.tipo); setPuntaje(String(p.puntaje));
         setOpciones(p.opciones.length > 0 ? p.opciones : [{ texto: '', es_correcta: false }]);
         setPares(p.pares.length > 0 ? p.pares : [{ lado_izquierdo: '', lado_derecho: '' }]);
         setEspacios(p.espacios.length > 0 ? p.espacios : [{ respuesta_correcta: '' }]);
-        setMostrarForm(false);
-        setError('');
+        setMostrarForm(false); setError('');
     };
 
     const handleEliminar = async (pregunta_id: string) => {
@@ -146,8 +117,7 @@ const ExamenDetallePage = () => {
             setError('');
             await api.delete(`/preguntas/${pregunta_id}`);
             cargarPreguntas();
-        } catch (err: unknown) {
-            const e = err as { response?: { data?: { message?: string } } };
+        } catch (e: any) {
             setError(e.response?.data?.message || 'Error al eliminar pregunta');
         }
     };
@@ -166,93 +136,95 @@ const ExamenDetallePage = () => {
     };
 
     const renderCamposExtra = () => {
-        if (tipo === 'OPCION_MULTIPLE') {
-            return (
-                <div className="admin-form-group">
-                    <label>Opciones (marca una o más como correctas)</label>
-                    {opciones.map((op, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <input value={op.texto} placeholder={`Opción ${i + 1}`} onChange={e => {
-                                const nuevas = [...opciones]; nuevas[i].texto = e.target.value; setOpciones(nuevas);
-                            }} />
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                                <input type="checkbox" checked={op.es_correcta} onChange={e => {
-                                    const nuevas = [...opciones]; nuevas[i].es_correcta = e.target.checked; setOpciones(nuevas);
-                                }} /> Correcta
-                            </label>
-                            {opciones.length > 2 && (
-                                <button type="button" onClick={() => setOpciones(opciones.filter((_, idx) => idx !== i))} className="action-btn btn-danger" style={{ padding: '0.2rem 0.5rem', fontSize: '12px' }}>✕</button>
-                            )}
-                        </div>
-                    ))}
-                    <button type="button" onClick={() => setOpciones([...opciones, { texto: '', es_correcta: false }])} className="action-btn" style={{ fontSize: '12px', padding: '0.3rem 0.8rem', marginTop: '0.25rem' }}>+ Opción</button>
-                </div>
-            );
-        }
-
-        if (tipo === 'VERDADERO_FALSO') {
-            return (
-                <div className="admin-form-group">
-                    <label>Respuesta correcta</label>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        {opciones.map((op, i) => (
-                            <label key={i} style={{
-                                display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 1rem',
-                                border: `2px solid ${op.es_correcta ? 'rgba(74, 222, 128, 0.5)' : 'rgba(255,255,255,0.15)'}`,
-                                borderRadius: '8px', background: op.es_correcta ? 'rgba(74, 222, 128, 0.1)' : 'transparent'
-                            }}>
-                                <input type="radio" name="vf_correcta" checked={op.es_correcta}
-                                    onChange={() => setOpciones(opciones.map((o, idx) => ({ ...o, es_correcta: idx === i })))} />
-                                {op.texto}
-                            </label>
-                        ))}
+        if (tipo === 'OPCION_MULTIPLE') return (
+            <div className="admin-form-group">
+                <label>Opciones (marca una o más como correctas)</label>
+                {opciones.map((op, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <input value={op.texto} placeholder={`Opción ${i + 1}`} onChange={e => {
+                            const n = [...opciones]; n[i].texto = e.target.value; setOpciones(n);
+                        }} style={{ flex: 1 }} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', whiteSpace: 'nowrap', color: '#6b7280', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={op.es_correcta} onChange={e => {
+                                const n = [...opciones]; n[i].es_correcta = e.target.checked; setOpciones(n);
+                            }} style={{ accentColor: '#16a34a' }} /> Correcta
+                        </label>
+                        {opciones.length > 2 && (
+                            <button type="button" onClick={() => setOpciones(opciones.filter((_, idx) => idx !== i))}
+                                className="action-btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '12px' }}>✕</button>
+                        )}
                     </div>
-                </div>
-            );
-        }
+                ))}
+                <button type="button" onClick={() => setOpciones([...opciones, { texto: '', es_correcta: false }])}
+                    className="action-btn" style={{ fontSize: '12px', marginTop: '0.25rem' }}>+ Opción</button>
+            </div>
+        );
 
-        if (tipo === 'RELACIONAR') {
-            return (
-                <div className="admin-form-group">
-                    <label>Pares (Izquierdo → Derecho)</label>
-                    {pares.map((par, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                            <input value={par.lado_izquierdo} placeholder={`Elemento ${i + 1}`} onChange={e => {
-                                const nuevos = [...pares]; nuevos[i].lado_izquierdo = e.target.value; setPares(nuevos);
-                            }} style={{ flex: 1 }} />
-                            <span style={{ color: '#64748b' }}>→</span>
-                            <input value={par.lado_derecho} placeholder="Par correcto" onChange={e => {
-                                const nuevos = [...pares]; nuevos[i].lado_derecho = e.target.value; setPares(nuevos);
-                            }} style={{ flex: 1 }} />
-                            {pares.length > 1 && (
-                                <button type="button" onClick={() => setPares(pares.filter((_, idx) => idx !== i))} className="action-btn btn-danger" style={{ padding: '0.2rem 0.5rem', fontSize: '12px' }}>✕</button>
-                            )}
-                        </div>
+        if (tipo === 'VERDADERO_FALSO') return (
+            <div className="admin-form-group">
+                <label>Respuesta correcta</label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    {opciones.map((op, i) => (
+                        <label key={i} style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer',
+                            padding: '0.6rem 1.25rem', borderRadius: '8px', fontWeight: 500,
+                            border: `2px solid ${op.es_correcta ? '#86efac' : '#e8e5de'}`,
+                            background: op.es_correcta ? '#dcfce7' : '#f7f6f2',
+                            color: op.es_correcta ? '#166534' : '#6b7280',
+                            transition: 'all 0.15s ease'
+                        }}>
+                            <input type="radio" name="vf_correcta" checked={op.es_correcta}
+                                onChange={() => setOpciones(opciones.map((o, idx) => ({ ...o, es_correcta: idx === i })))}
+                                style={{ accentColor: '#16a34a' }} />
+                            {op.texto}
+                        </label>
                     ))}
-                    <button type="button" onClick={() => setPares([...pares, { lado_izquierdo: '', lado_derecho: '' }])} className="action-btn" style={{ fontSize: '12px', padding: '0.3rem 0.8rem' }}>+ Par</button>
                 </div>
-            );
-        }
+            </div>
+        );
 
-        if (tipo === 'COMPLETAR') {
-            return (
-                <div className="admin-form-group">
-                    <label>Respuestas correctas por espacio</label>
-                    {espacios.map((esp, i) => (
-                        <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '13px', color: '#94a3b8', minWidth: '80px' }}>Espacio {i + 1}:</span>
-                            <input value={esp.respuesta_correcta} placeholder="Respuesta correcta" onChange={e => {
-                                const nuevos = [...espacios]; nuevos[i].respuesta_correcta = e.target.value; setEspacios(nuevos);
-                            }} style={{ flex: 1 }} />
-                            {espacios.length > 1 && (
-                                <button type="button" onClick={() => setEspacios(espacios.filter((_, idx) => idx !== i))} className="action-btn btn-danger" style={{ padding: '0.2rem 0.5rem', fontSize: '12px' }}>✕</button>
-                            )}
-                        </div>
-                    ))}
-                    <button type="button" onClick={() => setEspacios([...espacios, { respuesta_correcta: '' }])} className="action-btn" style={{ fontSize: '12px', padding: '0.3rem 0.8rem' }}>+ Espacio</button>
-                </div>
-            );
-        }
+        if (tipo === 'RELACIONAR') return (
+            <div className="admin-form-group">
+                <label>Pares (Izquierdo → Derecho correcto)</label>
+                {pares.map((par, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <input value={par.lado_izquierdo} placeholder={`Elemento ${i + 1}`} onChange={e => {
+                            const n = [...pares]; n[i].lado_izquierdo = e.target.value; setPares(n);
+                        }} style={{ flex: 1 }} />
+                        <span style={{ color: '#9ca3af', flexShrink: 0 }}>→</span>
+                        <input value={par.lado_derecho} placeholder="Par correcto" onChange={e => {
+                            const n = [...pares]; n[i].lado_derecho = e.target.value; setPares(n);
+                        }} style={{ flex: 1 }} />
+                        {pares.length > 1 && (
+                            <button type="button" onClick={() => setPares(pares.filter((_, idx) => idx !== i))}
+                                className="action-btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '12px' }}>✕</button>
+                        )}
+                    </div>
+                ))}
+                <button type="button" onClick={() => setPares([...pares, { lado_izquierdo: '', lado_derecho: '' }])}
+                    className="action-btn" style={{ fontSize: '12px', marginTop: '0.25rem' }}>+ Par</button>
+            </div>
+        );
+
+        if (tipo === 'COMPLETAR') return (
+            <div className="admin-form-group">
+                <label>Respuestas correctas por espacio</label>
+                {espacios.map((esp, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280', minWidth: '80px', fontWeight: 500 }}>Espacio {i + 1}:</span>
+                        <input value={esp.respuesta_correcta} placeholder="Respuesta correcta" onChange={e => {
+                            const n = [...espacios]; n[i].respuesta_correcta = e.target.value; setEspacios(n);
+                        }} style={{ flex: 1 }} />
+                        {espacios.length > 1 && (
+                            <button type="button" onClick={() => setEspacios(espacios.filter((_, idx) => idx !== i))}
+                                className="action-btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '12px' }}>✕</button>
+                        )}
+                    </div>
+                ))}
+                <button type="button" onClick={() => setEspacios([...espacios, { respuesta_correcta: '' }])}
+                    className="action-btn" style={{ fontSize: '12px', marginTop: '0.25rem' }}>+ Espacio</button>
+            </div>
+        );
 
         return null;
     };
@@ -264,7 +236,7 @@ const ExamenDetallePage = () => {
                 <div className="admin-page-container">
                     <div className="admin-header-flex">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <button onClick={() => navigate('/admin/examenes')} className="action-btn" style={{ padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                            <button onClick={() => navigate('/admin/examenes')} className="action-btn">
                                 ← Volver
                             </button>
                             <h2>Preguntas del examen</h2>
@@ -276,10 +248,14 @@ const ExamenDetallePage = () => {
                         )}
                     </div>
 
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && (
+                        <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                            {error}
+                        </p>
+                    )}
 
                     {(mostrarForm || editandoId) && (
-                        <div className="admin-form-card" style={{ borderColor: editandoId ? 'rgba(234, 179, 8, 0.4)' : undefined }}>
+                        <div className="admin-form-card" style={{ borderColor: editandoId ? '#fde68a' : undefined }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '1rem', marginBottom: '1rem' }}>
                                 <div className="admin-form-group" style={{ margin: 0 }}>
                                     <label>Enunciado</label>
@@ -287,11 +263,10 @@ const ExamenDetallePage = () => {
                                 </div>
                                 <div className="admin-form-group" style={{ margin: 0 }}>
                                     <label>Tipo</label>
-                                    <select value={tipo} onChange={e => handleCambioTipo(e.target.value as TipoPregunta)} disabled={!!editandoId}
-                                        style={{ padding: '0.7rem 1rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: 'white', fontSize: '0.95rem' }}>
-                                        {Object.entries(etiquetaTipo).map(([val, label]) => <option key={val} value={val} style={{ color: '#000' }}>{label}</option>)}
+                                    <select value={tipo} onChange={e => handleCambioTipo(e.target.value as TipoPregunta)} disabled={!!editandoId}>
+                                        {Object.entries(etiquetaTipo).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                                     </select>
-                                    {editandoId && <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0' }}>El tipo no se puede cambiar</p>}
+                                    {editandoId && <p style={{ fontSize: '11px', color: '#9ca3af', margin: '4px 0 0' }}>No se puede cambiar</p>}
                                 </div>
                                 <div className="admin-form-group" style={{ margin: 0 }}>
                                     <label>Puntaje</label>
@@ -299,18 +274,16 @@ const ExamenDetallePage = () => {
                                 </div>
                             </div>
                             {renderCamposExtra()}
-                            <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem' }}>
-                                <button onClick={editandoId ? handleEditar : handleCrear} className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                                <button onClick={editandoId ? handleEditar : handleCrear} className="btn-primary">
                                     {editandoId ? 'Guardar cambios' : 'Agregar pregunta'}
                                 </button>
-                                <button onClick={limpiarForm} className="action-btn" style={{ padding: '0.75rem 1.5rem', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                    Cancelar
-                                </button>
+                                <button onClick={limpiarForm} className="action-btn">Cancelar</button>
                             </div>
                         </div>
                     )}
 
-                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando preguntas...</p> : (
+                    {cargando ? <p style={{ color: '#6b7280' }}>Cargando preguntas...</p> : (
                         <div className="admin-table-container">
                             <table className="admin-table">
                                 <thead>
@@ -325,23 +298,21 @@ const ExamenDetallePage = () => {
                                 <tbody>
                                     {preguntas.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} style={{ textAlign: 'center', color: '#64748b', padding: '3rem' }}>
-                                                No hay preguntas registradas. Agrega la primera pregunta.
+                                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                                No hay preguntas registradas
                                             </td>
                                         </tr>
                                     ) : (
                                         preguntas.map(p => (
-                                            <tr key={p.id} style={{ background: editandoId === p.id ? 'rgba(234, 179, 8, 0.05)' : undefined }}>
-                                                <td>{p.orden}</td>
+                                            <tr key={p.id} style={{ background: editandoId === p.id ? '#fffbeb' : undefined }}>
+                                                <td style={{ color: '#6b7280' }}>{p.orden}</td>
                                                 <td style={{ fontWeight: 500 }}>{p.enunciado}</td>
                                                 <td>
-                                                    <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
-                                                        {etiquetaTipo[p.tipo]}
-                                                    </span>
+                                                    <span className="badge badge-info">{etiquetaTipo[p.tipo]}</span>
                                                 </td>
-                                                <td>{p.puntaje} pts</td>
+                                                <td style={{ color: '#6b7280' }}>{p.puntaje} pts</td>
                                                 <td style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    <button onClick={() => iniciarEdicion(p)} className="action-btn" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#facc15' }}>Editar</button>
+                                                    <button onClick={() => iniciarEdicion(p)} className="action-btn">Editar</button>
                                                     <button onClick={() => handleEliminar(p.id)} className="action-btn btn-danger">Eliminar</button>
                                                 </td>
                                             </tr>

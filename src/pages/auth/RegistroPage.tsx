@@ -45,9 +45,9 @@ const RegistroPage = () => {
                 </div>
 
                 {exito ? (
-                    <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(46, 204, 113, 0.2)', borderRadius: '10px', border: '1px solid rgba(46, 204, 113, 0.4)' }}>
-                        <p style={{ color: '#2ecc71', margin: 0, fontWeight: 600 }}>Cuenta creada correctamente.</p>
-                        <p style={{ color: '#a8c0ff', fontSize: '0.85rem', marginTop: '0.5rem' }}>Redirigiendo al login...</p>
+                    <div style={{ textAlign: 'center', padding: '1.5rem', background: '#dcfce7', borderRadius: '10px', border: '1px solid #86efac' }}>
+                        <p style={{ color: '#166534', margin: 0, fontWeight: 600, fontSize: '1rem' }}>✅ Cuenta creada correctamente.</p>
+                        <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '0.5rem' }}>Redirigiendo al login...</p>
                     </div>
                 ) : (
                     <form onSubmit={handleRegistro}>

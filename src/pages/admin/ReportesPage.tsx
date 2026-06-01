@@ -11,7 +11,7 @@ interface EstudianteResumen { id: string; nombre: string; email: string; }
 interface IntentoReporte {
     id: string; estado: string; calificacion_final: number | null;
     iniciado_en: string; entregado_en: string;
-    estudiante?: { nombre: string; email: string; };
+    estudiante?: { id: string; nombre: string; email: string; };
     examen?: { titulo: string; descripcion: string | null; categoria: { nombre: string }; };
 }
 
@@ -60,7 +60,17 @@ const ReportesPage = () => {
         }
     };
 
-    // ── Helpers para obtener filas de la tabla ──────────────────────
+    const darOportunidad = async (estudiante_id: string, examen_id: string) => {
+        if (!window.confirm('¿Dar una nueva oportunidad a este estudiante? Su intento anterior será eliminado.')) return;
+        try {
+            setError('');
+            await api.delete(`/admin/estudiantes/${estudiante_id}/examenes/${examen_id}/oportunidad`);
+            cargarReporte();
+        } catch (e: any) {
+            setError(e.response?.data?.message || 'Error al dar oportunidad');
+        }
+    };
+
     const getTitulo = (): string => {
         if (!reporte) return '';
         return tipoReporte === 'examen'
@@ -69,6 +79,11 @@ const ReportesPage = () => {
     };
 
     const getColumnas = () =>
+        tipoReporte === 'examen'
+            ? ['Estudiante', 'Email', 'Fecha de Entrega', 'Calificación', 'Acciones']
+            : ['Examen', 'Categoría', 'Fecha de Entrega', 'Calificación'];
+
+    const getColumnasCSV = () =>
         tipoReporte === 'examen'
             ? ['Estudiante', 'Email', 'Fecha de Entrega', 'Calificación']
             : ['Examen', 'Categoría', 'Fecha de Entrega', 'Calificación'];
@@ -87,10 +102,9 @@ const ReportesPage = () => {
                 : 'En revisión',
         ]);
 
-    // ── Exportar CSV ────────────────────────────────────────────────
     const exportarCSV = () => {
         if (!reporte) return;
-        const columnas = getColumnas();
+        const columnas = getColumnasCSV();
         const filas = getFilas();
         const contenido = [columnas, ...filas]
             .map(fila => fila.map((celda: string) => `"${celda}"`).join(','))
@@ -104,7 +118,6 @@ const ReportesPage = () => {
         URL.revokeObjectURL(url);
     };
 
-    // ── Exportar PDF ────────────────────────────────────────────────
     const exportarPDF = () => {
         if (!reporte) return;
         const doc = new jsPDF();
@@ -114,11 +127,11 @@ const ReportesPage = () => {
         doc.setTextColor(120);
         doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 25);
         autoTable(doc, {
-            head: [getColumnas()],
+            head: [getColumnasCSV()],
             body: getFilas(),
             startY: 30,
             styles: { fontSize: 10 },
-            headStyles: { fillColor: [83, 74, 183] },
+            headStyles: { fillColor: [22, 163, 74] },
         });
         doc.save(`reporte_${tipoReporte}_${Date.now()}.pdf`);
     };
@@ -127,23 +140,25 @@ const ReportesPage = () => {
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarAdmin />
-                
+
                 <div className="admin-page-container">
                     <div className="admin-header-flex">
-                        <h2>Reportes y Analíticas</h2>
+                        <h2>Reportes</h2>
                     </div>
 
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>{error}</p>}
 
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.4)', padding: '0.5rem', borderRadius: '12px', width: 'fit-content' }}>
-                        <button onClick={() => { setTipoReporte('examen'); setReporte(null); setError(''); }}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: '#f7f6f2', padding: '0.4rem', borderRadius: '8px', width: 'fit-content', border: '1px solid #e8e5de' }}>
+                        <button
+                            onClick={() => { setTipoReporte('examen'); setReporte(null); setError(''); }}
                             className={tipoReporte === 'examen' ? 'btn-primary' : 'action-btn'}
-                            style={{ padding: '0.6rem 1.2rem', background: tipoReporte === 'examen' ? '' : 'transparent', border: 'none', color: tipoReporte === 'examen' ? '' : '#94a3b8' }}>
+                            style={{ padding: '0.5rem 1.1rem', border: 'none' }}>
                             Por examen
                         </button>
-                        <button onClick={() => { setTipoReporte('estudiante'); setReporte(null); setError(''); }}
+                        <button
+                            onClick={() => { setTipoReporte('estudiante'); setReporte(null); setError(''); }}
                             className={tipoReporte === 'estudiante' ? 'btn-primary' : 'action-btn'}
-                            style={{ padding: '0.6rem 1.2rem', background: tipoReporte === 'estudiante' ? '' : 'transparent', border: 'none', color: tipoReporte === 'estudiante' ? '' : '#94a3b8' }}>
+                            style={{ padding: '0.5rem 1.1rem', border: 'none' }}>
                             Por estudiante
                         </button>
                     </div>
@@ -151,40 +166,40 @@ const ReportesPage = () => {
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap' }}>
                         {tipoReporte === 'examen' ? (
                             <select value={examenSeleccionado} onChange={e => setExamenSeleccionado(e.target.value)}
-                                style={{ padding: '0.7rem 1rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: 'white', fontSize: '0.95rem', minWidth: '300px' }}>
-                                <option value="" style={{ color: '#000' }}>Seleccionar examen...</option>
-                                {examenes.map(ex => <option key={ex.id} value={ex.id} style={{ color: '#000' }}>{ex.titulo}</option>)}
+                                style={{ padding: '0.65rem 0.9rem', background: '#f7f6f2', border: '1px solid #e8e5de', borderRadius: '6px', color: '#1a1a1a', fontSize: '0.95rem', minWidth: '300px', outline: 'none' }}>
+                                <option value="">Seleccionar examen...</option>
+                                {examenes.map(ex => <option key={ex.id} value={ex.id}>{ex.titulo}</option>)}
                             </select>
                         ) : (
                             <select value={estudianteSeleccionado} onChange={e => setEstudianteSeleccionado(e.target.value)}
-                                style={{ padding: '0.7rem 1rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: 'white', fontSize: '0.95rem', minWidth: '300px' }}>
-                                <option value="" style={{ color: '#000' }}>Seleccionar estudiante...</option>
-                                {estudiantes.map(est => <option key={est.id} value={est.id} style={{ color: '#000' }}>{est.nombre}</option>)}
+                                style={{ padding: '0.65rem 0.9rem', background: '#f7f6f2', border: '1px solid #e8e5de', borderRadius: '6px', color: '#1a1a1a', fontSize: '0.95rem', minWidth: '300px', outline: 'none' }}>
+                                <option value="">Seleccionar estudiante...</option>
+                                {estudiantes.map(est => <option key={est.id} value={est.id}>{est.nombre}</option>)}
                             </select>
                         )}
-                        <button onClick={cargarReporte} className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
+                        <button onClick={cargarReporte} className="btn-primary">
                             Generar reporte
                         </button>
                     </div>
 
-                    {cargando && <p style={{ color: '#94a3b8' }}>Cargando datos del reporte...</p>}
+                    {cargando && <p style={{ color: '#6b7280' }}>Cargando datos del reporte...</p>}
 
                     {reporte && !cargando && (
-                        <div className="admin-form-card" style={{ padding: '2rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
                                 <div>
-                                    <h3 style={{ fontSize: '1.3rem', color: '#f8fafc', margin: '0 0 0.4rem' }}>
+                                    <h3 style={{ fontSize: '1.2rem', color: '#1a1a1a', margin: '0 0 0.25rem', fontWeight: 700 }}>
                                         {tipoReporte === 'examen' ? reporte.examen.titulo : reporte.estudiante.nombre}
                                     </h3>
-                                    <p style={{ color: '#a8c0ff', margin: 0, fontSize: '0.95rem' }}>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '0.9rem' }}>
                                         {tipoReporte === 'examen' ? reporte.examen.categoria.nombre : reporte.estudiante.email}
                                     </p>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.8rem' }}>
-                                    <button onClick={exportarCSV} className="action-btn btn-success" style={{ padding: '0.6rem 1.2rem', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <button onClick={exportarCSV} className="action-btn btn-success">
                                         Exportar CSV
                                     </button>
-                                    <button onClick={exportarPDF} className="action-btn btn-danger" style={{ padding: '0.6rem 1.2rem', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                    <button onClick={exportarPDF} className="action-btn btn-danger">
                                         Exportar PDF
                                     </button>
                                 </div>
@@ -202,7 +217,7 @@ const ReportesPage = () => {
                                     <tbody>
                                         {reporte.intentos.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                                                <td colSpan={tipoReporte === 'examen' ? 5 : 4} style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
                                                     No hay resultados para este reporte
                                                 </td>
                                             </tr>
@@ -212,18 +227,28 @@ const ReportesPage = () => {
                                                     <td style={{ fontWeight: 500 }}>
                                                         {tipoReporte === 'examen' ? intento.estudiante?.nombre : intento.examen?.titulo}
                                                     </td>
-                                                    <td style={{ color: '#94a3b8' }}>
+                                                    <td style={{ color: '#6b7280' }}>
                                                         {tipoReporte === 'examen' ? intento.estudiante?.email : intento.examen?.categoria.nombre}
                                                     </td>
-                                                    <td>
+                                                    <td style={{ color: '#6b7280' }}>
                                                         {intento.entregado_en ? new Date(intento.entregado_en).toLocaleDateString() : '—'}
                                                     </td>
                                                     <td>
                                                         {intento.estado === 'CALIFICADO'
-                                                            ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.05rem' }}>{formatearCalificacion(intento.calificacion_final)}</span>
-                                                            : <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>En revisión</span>
+                                                            ? <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>{formatearCalificacion(intento.calificacion_final)}</span>
+                                                            : <span className="badge badge-warning">En revisión</span>
                                                         }
                                                     </td>
+                                                    {tipoReporte === 'examen' && (
+                                                        <td>
+                                                            <button
+                                                                onClick={() => darOportunidad(intento.estudiante?.id ?? '', examenSeleccionado)}
+                                                                className="action-btn"
+                                                                style={{ fontSize: '0.8rem' }}>
+                                                                Nueva oportunidad
+                                                            </button>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             ))
                                         )}

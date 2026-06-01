@@ -43,9 +43,9 @@ const CalificacionesPage = () => {
                     <div className="admin-header-flex">
                         <h2>Mis Calificaciones</h2>
                     </div>
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>{error}</p>}
 
-                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando calificaciones...</p> : calificaciones.length === 0 ? (
+                    {cargando ? <p style={{ color: '#6b7280' }}>Cargando calificaciones...</p> : calificaciones.length === 0 ? (
                         <div className="admin-table-container" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                             <p>Aún no has completado ningún examen.</p>
                         </div>
@@ -65,15 +65,15 @@ const CalificacionesPage = () => {
                                         <tr key={item.id}>
                                             <td style={{ fontWeight: 500, fontSize: '15px' }}>{item.examen.titulo}</td>
                                             <td>
-                                                <span className="badge" style={{ background: 'rgba(168, 192, 255, 0.15)', color: '#a8c0ff', border: '1px solid rgba(168, 192, 255, 0.3)' }}>
+                                                <span className="badge badge-info">
                                                     {item.examen.categoria.nombre}
                                                 </span>
                                             </td>
-                                            <td style={{ color: '#94a3b8' }}>{new Date(item.entregado_en).toLocaleDateString()} a las {new Date(item.entregado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                                            <td style={{ color: '#6b7280' }}>{new Date(item.entregado_en).toLocaleDateString()} a las {new Date(item.entregado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                             <td>
                                                 {item.estado === 'CALIFICADO'
-                                                    ? <span style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.2rem' }}>{formatearCalificacion(item.calificacion_final)}</span>
-                                                    : <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)' }}>En revisión</span>
+                                                    ? <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>{formatearCalificacion(item.calificacion_final)}</span>
+                                                    : <span className="badge badge-warning">En revisión</span>
                                                 }
                                             </td>
                                         </tr>

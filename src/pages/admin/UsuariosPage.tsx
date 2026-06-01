@@ -70,7 +70,6 @@ const UsuariosPage = () => {
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarAdmin />
-                
                 <div className="admin-page-container">
                     <div className="admin-header-flex">
                         <h2>Gestión de Usuarios</h2>
@@ -79,7 +78,11 @@ const UsuariosPage = () => {
                         </button>
                     </div>
 
-                    {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '1rem' }}>{error}</p>}
+                    {error && (
+                        <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                            {error}
+                        </p>
+                    )}
 
                     {mostrarForm && (
                         <div className="admin-form-card">
@@ -95,15 +98,13 @@ const UsuariosPage = () => {
                                 <label>Contraseña</label>
                                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
                             </div>
-                            <div style={{ paddingBottom: '2px' }}>
-                                <button onClick={handleCrear} className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
-                                    Guardar Usuario
-                                </button>
-                            </div>
+                            <button onClick={handleCrear} className="btn-primary">
+                                Guardar estudiante
+                            </button>
                         </div>
                     )}
 
-                    {cargando ? <p style={{ color: '#94a3b8' }}>Cargando datos de usuarios...</p> : (
+                    {cargando ? <p style={{ color: '#6b7280' }}>Cargando usuarios...</p> : (
                         <div className="admin-table-container">
                             <table className="admin-table">
                                 <thead>
@@ -118,16 +119,16 @@ const UsuariosPage = () => {
                                 <tbody>
                                     {usuarios.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} style={{ textAlign: 'center', color: '#64748b', padding: '3rem' }}>
-                                                No hay estudiantes registrados en el sistema.
+                                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                                No hay estudiantes registrados
                                             </td>
                                         </tr>
                                     ) : (
                                         usuarios.map(u => (
                                             <tr key={u.id}>
                                                 <td style={{ fontWeight: 500 }}>{u.nombre}</td>
-                                                <td>{u.email}</td>
-                                                <td>{new Date(u.creado_en).toLocaleDateString()}</td>
+                                                <td style={{ color: '#6b7280' }}>{u.email}</td>
+                                                <td style={{ color: '#6b7280' }}>{new Date(u.creado_en).toLocaleDateString()}</td>
                                                 <td>
                                                     <span className={`badge ${u.activo ? 'badge-active' : 'badge-inactive'}`}>
                                                         {u.activo ? 'Activo' : 'Inactivo'}
@@ -140,7 +141,7 @@ const UsuariosPage = () => {
                                                     </button>
                                                     {!u.activo && (
                                                         <button onClick={() => handleEliminar(u.id)}
-                                                            className="action-btn btn-danger" style={{ background: 'rgba(153, 27, 27, 0.5)', borderColor: 'rgba(153, 27, 27, 0.8)' }}>
+                                                            className="action-btn btn-danger">
                                                             Eliminar
                                                         </button>
                                                     )}

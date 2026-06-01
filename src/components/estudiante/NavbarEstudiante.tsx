@@ -1,29 +1,34 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import '../../pages/admin/Admin.css';
 
 const NavbarEstudiante = () => {
     const { usuario, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
+    const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
+
     return (
         <nav className="admin-navbar">
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <span className="admin-navbar-logo">ExamFlow</span>
+            <div className="admin-navbar-logo">
+                Sistema de Cuestionarios y Exámenes
             </div>
-            <div className="admin-navbar-links" style={{ display: 'flex', gap: '2rem', alignItems: 'center', justifyContent: 'center' }}>
-                <Link to="/estudiante" style={{ color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 500, letterSpacing: '0.3px' }}>Inicio</Link>
-                <Link to="/estudiante/examenes" style={{ color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 500, letterSpacing: '0.3px' }}>Exámenes</Link>
-                <Link to="/estudiante/calificaciones" style={{ color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 500, letterSpacing: '0.3px' }}>Calificaciones</Link>
+
+            <div className="admin-navbar-links">
+                <Link to="/estudiante" className={location.pathname === '/estudiante' ? 'active' : ''}>Inicio</Link>
+                <Link to="/estudiante/examenes" className={isActive('/estudiante/examenes') ? 'active' : ''}>Exámenes</Link>
+                <Link to="/estudiante/calificaciones" className={isActive('/estudiante/calificaciones') ? 'active' : ''}>Calificaciones</Link>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500, background: 'rgba(255,255,255,0.1)', padding: '0.4rem 1rem', borderRadius: '99px' }}>{usuario?.nombre}</span>
-                <button onClick={handleLogout} className="action-btn btn-danger" style={{ padding: '0.4rem 1rem', fontSize: '13px' }}>
+
+            <div className="admin-navbar-user">
+                <span>{usuario?.nombre}</span>
+                <button onClick={handleLogout} className="btn-logout">
                     Cerrar sesión
                 </button>
             </div>
