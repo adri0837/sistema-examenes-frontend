@@ -10,6 +10,7 @@ interface Par { id?: string; lado_izquierdo: string; lado_derecho: string; }
 interface Espacio { id?: string; respuesta_correcta: string; }
 interface Pregunta {
     id: string; orden: number; enunciado: string; tipo: TipoPregunta; puntaje: number;
+    tiempo_limite_seg: number | null;
     opciones: Opcion[]; pares: Par[]; espacios: Espacio[];
 }
 
@@ -32,6 +33,7 @@ const ExamenDetallePage = () => {
     const [enunciado, setEnunciado] = useState('');
     const [tipo, setTipo] = useState<TipoPregunta>('OPCION_MULTIPLE');
     const [puntaje, setPuntaje] = useState('');
+    const [tiempoLimiteSeg, setTiempoLimiteSeg] = useState('');
     const [opciones, setOpciones] = useState<Opcion[]>([{ texto: '', es_correcta: false }, { texto: '', es_correcta: false }]);
     const [pares, setPares] = useState<Par[]>([{ lado_izquierdo: '', lado_derecho: '' }]);
     const [espacios, setEspacios] = useState<Espacio[]>([{ respuesta_correcta: '' }]);
@@ -51,7 +53,7 @@ const ExamenDetallePage = () => {
     useEffect(() => { cargarPreguntas(); }, [id]);
 
     const limpiarForm = () => {
-        setEditandoId(null); setEnunciado(''); setTipo('OPCION_MULTIPLE'); setPuntaje('');
+        setEditandoId(null); setEnunciado(''); setTipo('OPCION_MULTIPLE'); setPuntaje(''); setTiempoLimiteSeg('');
         setOpciones([{ texto: '', es_correcta: false }, { texto: '', es_correcta: false }]);
         setPares([{ lado_izquierdo: '', lado_derecho: '' }]);
         setEspacios([{ respuesta_correcta: '' }]);
@@ -77,6 +79,7 @@ const ExamenDetallePage = () => {
             setError('');
             await api.post(`/examenes/${id}/preguntas`, {
                 enunciado, tipo, puntaje: Number(puntaje),
+                tiempo_limite_seg: tiempoLimiteSeg ? Number(tiempoLimiteSeg) : undefined,
                 opciones: (tipo === 'OPCION_MULTIPLE' || tipo === 'VERDADERO_FALSO') ? opciones : undefined,
                 pares: tipo === 'RELACIONAR' ? pares : undefined,
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
@@ -93,6 +96,7 @@ const ExamenDetallePage = () => {
             setError('');
             await api.put(`/preguntas/${editandoId}`, {
                 enunciado, puntaje: Number(puntaje),
+                tiempo_limite_seg: tiempoLimiteSeg ? Number(tiempoLimiteSeg) : undefined,
                 opciones: (tipo === 'OPCION_MULTIPLE' || tipo === 'VERDADERO_FALSO') ? opciones : undefined,
                 pares: tipo === 'RELACIONAR' ? pares : undefined,
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
@@ -105,6 +109,7 @@ const ExamenDetallePage = () => {
 
     const iniciarEdicion = (p: Pregunta) => {
         setEditandoId(p.id); setEnunciado(p.enunciado); setTipo(p.tipo); setPuntaje(String(p.puntaje));
+        setTiempoLimiteSeg(p.tiempo_limite_seg ? String(p.tiempo_limite_seg) : '');
         setOpciones(p.opciones.length > 0 ? p.opciones : [{ texto: '', es_correcta: false }]);
         setPares(p.pares.length > 0 ? p.pares : [{ lado_izquierdo: '', lado_derecho: '' }]);
         setEspacios(p.espacios.length > 0 ? p.espacios : [{ respuesta_correcta: '' }]);
@@ -272,6 +277,10 @@ const ExamenDetallePage = () => {
                                     <label>Puntaje</label>
                                     <input type="number" min="1" value={puntaje} onChange={e => setPuntaje(e.target.value)} style={{ width: '90px' }} />
                                 </div>
+                                <div className="admin-form-group" style={{ margin: 0 }}>
+                                    <label>Tiempo límite (min)</label>
+                                    <input type="number" min="5" placeholder="Sin límite" value={tiempoLimiteSeg} onChange={e => setTiempoLimiteSeg(e.target.value)} style={{ width: '120px' }} />
+                                </div>
                             </div>
                             {renderCamposExtra()}
                             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
@@ -285,6 +294,16 @@ const ExamenDetallePage = () => {
 
                     {cargando ? <p style={{ color: '#6b7280' }}>Cargando preguntas...</p> : (
                         <div className="admin-table-container">
+                            {preguntas.length > 0 && (() => {
+                                const totalMin = preguntas.reduce((sum, p) => sum + (p.tiempo_limite_seg || 0), 0);
+                                const conTiempo = preguntas.filter(p => p.tiempo_limite_seg).length;
+                                return totalMin > 0 ? (
+                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.6rem 1rem', marginBottom: '0.75rem', fontSize: '0.88rem', color: '#166534', display: 'flex', gap: '1.5rem' }}>
+                                        <span>⏱ <strong>Tiempo total del examen:</strong> {totalMin} min</span>
+                                        <span style={{ color: '#6b7280' }}>{conTiempo} de {preguntas.length} preguntas con tiempo asignado</span>
+                                    </div>
+                                ) : null;
+                            })()}
                             <table className="admin-table">
                                 <thead>
                                     <tr>
@@ -292,13 +311,14 @@ const ExamenDetallePage = () => {
                                         <th>Enunciado</th>
                                         <th>Tipo</th>
                                         <th>Puntaje</th>
+                                        <th>Tiempo</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {preguntas.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
                                                 No hay preguntas registradas
                                             </td>
                                         </tr>
@@ -311,6 +331,7 @@ const ExamenDetallePage = () => {
                                                     <span className="badge badge-info">{etiquetaTipo[p.tipo]}</span>
                                                 </td>
                                                 <td style={{ color: '#6b7280' }}>{p.puntaje} pts</td>
+                                                <td style={{ color: '#6b7280' }}>{p.tiempo_limite_seg ? `${p.tiempo_limite_seg} min` : '—'}</td>
                                                 <td style={{ display: 'flex', gap: '0.5rem' }}>
                                                     <button onClick={() => iniciarEdicion(p)} className="action-btn">Editar</button>
                                                     <button onClick={() => handleEliminar(p.id)} className="action-btn btn-danger">Eliminar</button>

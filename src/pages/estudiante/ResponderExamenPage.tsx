@@ -10,11 +10,11 @@ interface Par { id: string; lado_izquierdo: string; lado_derecho: string; }
 interface Espacio { id: string; numero_espacio: number; }
 interface Pregunta {
     id: string; orden: number; enunciado: string; tipo: TipoPregunta; puntaje: number;
+    tiempo_limite_seg: number | null;
     opciones: Opcion[]; pares: Par[]; espacios: Espacio[];
 }
-interface Examen { id: string; titulo: string; tiempo_limite_min: number | null; }
+interface Examen { id: string; titulo: string; }
 
-// Mezclar array — Fisher-Yates
 const mezclar = <T,>(arr: T[]): T[] => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -30,14 +30,15 @@ const ResponderExamenPage = () => {
     const [examen, setExamen] = useState<Examen | null>(null);
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
     const [respuestas, setRespuestas] = useState<Record<string, Partial<RespuestaEntrega>>>({});
+    const [indicePregunta, setIndicePregunta] = useState(0);
+    const [segundosPregunta, setSegundosPregunta] = useState<number | null>(null);
     const [entregado, setEntregado] = useState(false);
     const [entregando, setEntregando] = useState(false);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
-    const [segundos, setSegundos] = useState<number | null>(null);
     const entregandoRef = useRef(false);
+    const avanzandoRef = useRef(false);
 
-    // Lados derechos mezclados por pregunta — se generan una sola vez al cargar
     const derechosMezclados = useMemo(() => {
         const mapa: Record<string, string[]> = {};
         preguntas.forEach(p => {
@@ -54,11 +55,14 @@ const ResponderExamenPage = () => {
                 const { data } = await api.get(`/estudiante/intentos/${intento_id}`);
                 setExamen(data.examen);
                 setPreguntas(data.preguntas);
-                if (data.examen.tiempo_limite_min) {
-                    setSegundos(data.examen.tiempo_limite_min * 60);
-                }
                 if (data.examen?.id) {
                     localStorage.setItem(`intento_${data.examen.id}`, data.intento.id);
+                }
+                // Iniciar timer de la primera pregunta
+                if (data.preguntas[0]?.tiempo_limite_seg) {
+                    setSegundosPregunta(data.preguntas[0].tiempo_limite_seg * 60);
+                } else {
+                    setSegundosPregunta(null);
                 }
             } catch {
                 setError('Error al cargar el examen. Puede que ya haya sido entregado.');
@@ -69,37 +73,11 @@ const ResponderExamenPage = () => {
         cargar();
     }, [intento_id]);
 
-    useEffect(() => {
-        if (segundos === null || segundos <= 0 || entregado || entregando || cargando) return;
-        const timer = setInterval(() => {
-            setSegundos(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [cargando, entregado, entregando]);
+    const preguntaActual = preguntas[indicePregunta];
+    const esUltimaPregunta = indicePregunta === preguntas.length - 1;
 
-    const handleEntregar = useCallback(async (forzar = false) => {
+    const handleEntregar = useCallback(async () => {
         if (entregandoRef.current || entregado) return;
-
-        if (!forzar) {
-            const sinResponder = preguntas.filter(p => {
-                const r = respuestas[p.id];
-                if (!r) return true;
-                if (p.tipo === 'ABIERTA') return !r.texto_respuesta?.trim();
-                if (p.tipo === 'OPCION_MULTIPLE' || p.tipo === 'VERDADERO_FALSO') return !r.opciones_seleccionadas?.length;
-                if (p.tipo === 'RELACIONAR') return !r.pares_relacionados?.length || r.pares_relacionados.some(p => !p.derecho);
-                if (p.tipo === 'COMPLETAR') return !r.espacios_respuestas?.length || r.espacios_respuestas.some(e => !e?.trim());
-                return true;
-            });
-
-            if (sinResponder.length > 0) {
-                const confirmar = window.confirm(`Tienes ${sinResponder.length} pregunta(s) sin responder. ¿Deseas entregar de todas formas?`);
-                if (!confirmar) return;
-            } else {
-                const confirmar = window.confirm('¿Estás seguro de que deseas entregar el examen? No podrás modificar tus respuestas.');
-                if (!confirmar) return;
-            }
-        }
-
         entregandoRef.current = true;
         setEntregando(true);
         try {
@@ -118,11 +96,42 @@ const ResponderExamenPage = () => {
         }
     }, [entregado, preguntas, respuestas, intento_id, examen?.id]);
 
+    const avanzarPregunta = useCallback(() => {
+        if (avanzandoRef.current) return;
+        avanzandoRef.current = true;
+
+        setIndicePregunta(prev => {
+            const siguiente = prev + 1;
+            if (siguiente >= preguntas.length) {
+                // Entregar
+                handleEntregar();
+                return prev;
+            }
+            // Configurar timer de la siguiente pregunta
+            const sigPregunta = preguntas[siguiente];
+            setSegundosPregunta(sigPregunta.tiempo_limite_seg ? sigPregunta.tiempo_limite_seg * 60 : null);
+            avanzandoRef.current = false;
+            return siguiente;
+        });
+    }, [preguntas, handleEntregar]);
+
+    // Timer por pregunta
     useEffect(() => {
-        if (segundos === 0 && !entregado && !entregando && !cargando && preguntas.length > 0) {
-            handleEntregar(true);
+        if (segundosPregunta === null || entregado || entregando || cargando) return;
+        if (segundosPregunta <= 0) {
+            avanzarPregunta();
+            return;
         }
-    }, [segundos, entregado, entregando, cargando, preguntas.length, handleEntregar]);
+        const timer = setInterval(() => {
+            setSegundosPregunta(prev => (prev !== null && prev > 1 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [segundosPregunta, entregado, entregando, cargando]);
+
+    const handleSiguiente = () => {
+        avanzandoRef.current = false;
+        avanzarPregunta();
+    };
 
     const formatTiempo = (s: number) => {
         const m = Math.floor(s / 60);
@@ -199,198 +208,209 @@ const ResponderExamenPage = () => {
         );
     }
 
+    if (!preguntaActual) return null;
+
+    const tiempoAgotandose = segundosPregunta !== null && segundosPregunta <= 10;
+
     return (
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarEstudiante />
-                <div className="admin-page-container" style={{ maxWidth: '780px', margin: '0 auto' }}>
+                <div className="admin-page-container" style={{ maxWidth: '680px', margin: '0 auto' }}>
 
-                    {/* Header sticky */}
+                    {/* Header */}
                     <div style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         background: 'white', padding: '1.1rem 1.5rem', borderRadius: '12px',
-                        border: '1px solid #e8e5de', marginBottom: '2rem',
+                        border: '1px solid #e8e5de', marginBottom: '1.5rem',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.06)', position: 'sticky', top: '1rem', zIndex: 10
                     }}>
-                        <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#1a1a1a', fontWeight: 700 }}>{examen?.titulo}</h2>
-                        {segundos !== null && (
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1a1a1a', fontWeight: 700 }}>{examen?.titulo}</h2>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#9ca3af' }}>
+                                Pregunta {indicePregunta + 1} de {preguntas.length}
+                            </p>
+                        </div>
+                        {segundosPregunta !== null && (
                             <span style={{
-                                color: segundos < 60 ? '#dc2626' : '#16a34a',
-                                fontWeight: 700, fontSize: '1.1rem',
-                                background: segundos < 60 ? '#fef2f2' : '#dcfce7',
+                                color: tiempoAgotandose ? '#dc2626' : '#16a34a',
+                                fontWeight: 700, fontSize: '1.2rem',
+                                background: tiempoAgotandose ? '#fef2f2' : '#dcfce7',
                                 padding: '0.4rem 0.9rem', borderRadius: '8px',
-                                border: `1px solid ${segundos < 60 ? '#fecaca' : '#bbf7d0'}`
+                                border: `1px solid ${tiempoAgotandose ? '#fecaca' : '#bbf7d0'}`,
+                                transition: 'all 0.3s',
+                                animation: tiempoAgotandose ? 'pulse 0.8s infinite' : 'none'
                             }}>
-                                ⏱ {formatTiempo(segundos)}
+                                ⏱ {formatTiempo(segundosPregunta)}
                             </span>
                         )}
                     </div>
 
-                    {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>{error}</p>}
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                        {preguntas.map((pregunta, index) => (
-                            <div key={pregunta.id} style={{
-                                background: 'white', border: '1px solid #e8e5de',
-                                borderRadius: '12px', padding: '1.75rem',
-                                borderLeft: '4px solid #16a34a',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '0.78rem', color: '#16a34a', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                                        Pregunta {index + 1}
-                                    </span>
-                                    <span className="badge badge-info" style={{ fontSize: '0.78rem' }}>
-                                        {pregunta.puntaje} pts
-                                    </span>
-                                </div>
-
-                                <p style={{ margin: '0 0 1.25rem', fontSize: '1.05rem', color: '#1a1a1a', lineHeight: 1.6, fontWeight: 500 }}>
-                                    {pregunta.enunciado}
-                                </p>
-
-                                {/* Opción múltiple */}
-                                {pregunta.tipo === 'OPCION_MULTIPLE' && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                        <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Selecciona una o más opciones</p>
-                                        {pregunta.opciones.map(opcion => {
-                                            const isSelected = (respuestas[pregunta.id]?.opciones_seleccionadas || []).includes(opcion.id);
-                                            return (
-                                                <label key={opcion.id} style={{
-                                                    display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer',
-                                                    background: isSelected ? '#dcfce7' : '#f7f6f2',
-                                                    padding: '0.85rem 1rem', borderRadius: '8px',
-                                                    border: isSelected ? '1px solid #86efac' : '1px solid #e8e5de',
-                                                    color: isSelected ? '#166534' : '#374151',
-                                                    fontWeight: isSelected ? 600 : 400,
-                                                    transition: 'all 0.15s ease'
-                                                }}>
-                                                    <input type="checkbox" checked={isSelected}
-                                                        onChange={e => handleOpcionMultiple(pregunta.id, opcion.id, e.target.checked)}
-                                                        style={{ transform: 'scale(1.2)', accentColor: '#16a34a' }} />
-                                                    {opcion.texto}
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* Verdadero / Falso */}
-                                {pregunta.tipo === 'VERDADERO_FALSO' && (
-                                    <div style={{ display: 'flex', gap: '1rem' }}>
-                                        {pregunta.opciones.map(opcion => {
-                                            const isSelected = respuestas[pregunta.id]?.opciones_seleccionadas?.[0] === opcion.id;
-                                            return (
-                                                <label key={opcion.id} style={{
-                                                    display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer',
-                                                    background: isSelected ? '#dcfce7' : '#f7f6f2',
-                                                    padding: '0.85rem 1.5rem', borderRadius: '8px', flex: 1, justifyContent: 'center',
-                                                    border: isSelected ? '1px solid #86efac' : '1px solid #e8e5de',
-                                                    color: isSelected ? '#166534' : '#374151',
-                                                    fontWeight: isSelected ? 700 : 500,
-                                                    fontSize: '1rem', transition: 'all 0.15s ease'
-                                                }}>
-                                                    <input type="radio" name={pregunta.id} checked={isSelected}
-                                                        onChange={() => handleVerdaderoFalso(pregunta.id, opcion.id)}
-                                                        style={{ accentColor: '#16a34a' }} />
-                                                    {opcion.texto}
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* Abierta */}
-                                {pregunta.tipo === 'ABIERTA' && (
-                                    <textarea rows={5} placeholder="Escribe tu respuesta aquí..."
-                                        value={respuestas[pregunta.id]?.texto_respuesta || ''}
-                                        onChange={e => handleTexto(pregunta.id, e.target.value)}
-                                        style={{
-                                            width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem',
-                                            borderRadius: '8px', border: '1px solid #e8e5de', resize: 'vertical',
-                                            boxSizing: 'border-box', background: '#f7f6f2', color: '#1a1a1a',
-                                            fontFamily: 'inherit', outline: 'none', lineHeight: 1.6,
-                                            transition: 'border-color 0.15s'
-                                        }}
-                                        onFocus={e => e.target.style.borderColor = '#16a34a'}
-                                        onBlur={e => e.target.style.borderColor = '#e8e5de'}
-                                    />
-                                )}
-
-                                {/* Relacionar columnas — lados derechos mezclados */}
-                                {pregunta.tipo === 'RELACIONAR' && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                        <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Relaciona cada elemento con su par correcto</p>
-                                        {pregunta.pares.map((par, i) => (
-                                            <div key={par.id} style={{
-                                                display: 'flex', gap: '1rem', alignItems: 'center',
-                                                background: '#f7f6f2', padding: '0.85rem 1rem',
-                                                borderRadius: '8px', border: '1px solid #e8e5de'
-                                            }}>
-                                                <span style={{ fontSize: '0.95rem', minWidth: '140px', color: '#1a1a1a', fontWeight: 600 }}>
-                                                    {par.lado_izquierdo}
-                                                </span>
-                                                <span style={{ color: '#9ca3af', flexShrink: 0 }}>➜</span>
-                                                <select
-                                                    value={respuestas[pregunta.id]?.pares_relacionados?.[i]?.derecho || ''}
-                                                    onChange={e => handlePar(pregunta.id, par.lado_izquierdo, e.target.value, i)}
-                                                    style={{
-                                                        padding: '0.55rem 0.9rem', border: '1px solid #e8e5de',
-                                                        borderRadius: '6px', fontSize: '0.95rem',
-                                                        background: 'white', color: '#1a1a1a', flex: 1, outline: 'none'
-                                                    }}>
-                                                    <option value="">Seleccionar...</option>
-                                                    {(derechosMezclados[pregunta.id] || pregunta.pares.map(p => p.lado_derecho)).map((derecho, idx) => (
-                                                        <option key={idx} value={derecho}>{derecho}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Completar espacios */}
-                                {pregunta.tipo === 'COMPLETAR' && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                        {pregunta.espacios.map((esp, i) => (
-                                            <div key={esp.id} style={{
-                                                display: 'flex', alignItems: 'center', gap: '1rem',
-                                                background: '#f7f6f2', padding: '0.85rem 1rem',
-                                                borderRadius: '8px', border: '1px solid #e8e5de'
-                                            }}>
-                                                <span style={{ fontSize: '0.9rem', color: '#6b7280', minWidth: '90px', fontWeight: 600 }}>
-                                                    Espacio {esp.numero_espacio}:
-                                                </span>
-                                                <input
-                                                    placeholder="Escribe la palabra o frase"
-                                                    value={respuestas[pregunta.id]?.espacios_respuestas?.[i] || ''}
-                                                    onChange={e => handleEspacio(pregunta.id, e.target.value, i)}
-                                                    style={{
-                                                        padding: '0.55rem 0.9rem', border: '1px solid #e8e5de',
-                                                        borderRadius: '6px', fontSize: '0.95rem',
-                                                        background: 'white', color: '#1a1a1a', flex: 1, outline: 'none'
-                                                    }}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                    {/* Barra de progreso */}
+                    <div style={{ background: '#e8e5de', borderRadius: '99px', height: '6px', marginBottom: '1.5rem', overflow: 'hidden' }}>
+                        <div style={{
+                            background: '#16a34a', height: '100%', borderRadius: '99px',
+                            width: `${((indicePregunta + 1) / preguntas.length) * 100}%`,
+                            transition: 'width 0.4s ease'
+                        }} />
                     </div>
 
+                    {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>{error}</p>}
+
+                    {/* Tarjeta de pregunta */}
+                    <div style={{
+                        background: 'white', border: '1px solid #e8e5de',
+                        borderRadius: '16px', padding: '2rem',
+                        borderLeft: '4px solid #16a34a',
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.78rem', color: '#16a34a', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                                Pregunta {indicePregunta + 1}
+                            </span>
+                            <span className="badge badge-info" style={{ fontSize: '0.78rem' }}>
+                                {preguntaActual.puntaje} pts
+                            </span>
+                        </div>
+
+                        <p style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', color: '#1a1a1a', lineHeight: 1.6, fontWeight: 500 }}>
+                            {preguntaActual.enunciado}
+                        </p>
+
+                        {/* Opción múltiple */}
+                        {preguntaActual.tipo === 'OPCION_MULTIPLE' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Selecciona una o más opciones</p>
+                                {preguntaActual.opciones.map(opcion => {
+                                    const isSelected = (respuestas[preguntaActual.id]?.opciones_seleccionadas || []).includes(opcion.id);
+                                    return (
+                                        <label key={opcion.id} style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer',
+                                            background: isSelected ? '#dcfce7' : '#f7f6f2',
+                                            padding: '0.85rem 1rem', borderRadius: '8px',
+                                            border: isSelected ? '1px solid #86efac' : '1px solid #e8e5de',
+                                            color: isSelected ? '#166534' : '#374151',
+                                            fontWeight: isSelected ? 600 : 400, transition: 'all 0.15s ease'
+                                        }}>
+                                            <input type="checkbox" checked={isSelected}
+                                                onChange={e => handleOpcionMultiple(preguntaActual.id, opcion.id, e.target.checked)}
+                                                style={{ transform: 'scale(1.2)', accentColor: '#16a34a' }} />
+                                            {opcion.texto}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Verdadero / Falso */}
+                        {preguntaActual.tipo === 'VERDADERO_FALSO' && (
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                {preguntaActual.opciones.map(opcion => {
+                                    const isSelected = respuestas[preguntaActual.id]?.opciones_seleccionadas?.[0] === opcion.id;
+                                    return (
+                                        <label key={opcion.id} style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer',
+                                            background: isSelected ? '#dcfce7' : '#f7f6f2',
+                                            padding: '0.85rem 1.5rem', borderRadius: '8px', flex: 1, justifyContent: 'center',
+                                            border: isSelected ? '1px solid #86efac' : '1px solid #e8e5de',
+                                            color: isSelected ? '#166534' : '#374151',
+                                            fontWeight: isSelected ? 700 : 500, fontSize: '1rem', transition: 'all 0.15s ease'
+                                        }}>
+                                            <input type="radio" name={preguntaActual.id} checked={isSelected}
+                                                onChange={() => handleVerdaderoFalso(preguntaActual.id, opcion.id)}
+                                                style={{ accentColor: '#16a34a' }} />
+                                            {opcion.texto}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Abierta */}
+                        {preguntaActual.tipo === 'ABIERTA' && (
+                            <textarea rows={5} placeholder="Escribe tu respuesta aquí..."
+                                value={respuestas[preguntaActual.id]?.texto_respuesta || ''}
+                                onChange={e => handleTexto(preguntaActual.id, e.target.value)}
+                                style={{
+                                    width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem',
+                                    borderRadius: '8px', border: '1px solid #e8e5de', resize: 'vertical',
+                                    boxSizing: 'border-box', background: '#f7f6f2', color: '#1a1a1a',
+                                    fontFamily: 'inherit', outline: 'none', lineHeight: 1.6
+                                }}
+                                onFocus={e => e.target.style.borderColor = '#16a34a'}
+                                onBlur={e => e.target.style.borderColor = '#e8e5de'}
+                            />
+                        )}
+
+                        {/* Relacionar */}
+                        {preguntaActual.tipo === 'RELACIONAR' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Relaciona cada elemento con su par correcto</p>
+                                {preguntaActual.pares.map((par, i) => (
+                                    <div key={par.id} style={{
+                                        display: 'flex', gap: '1rem', alignItems: 'center',
+                                        background: '#f7f6f2', padding: '0.85rem 1rem',
+                                        borderRadius: '8px', border: '1px solid #e8e5de'
+                                    }}>
+                                        <span style={{ fontSize: '0.95rem', minWidth: '140px', color: '#1a1a1a', fontWeight: 600 }}>{par.lado_izquierdo}</span>
+                                        <span style={{ color: '#9ca3af', flexShrink: 0 }}>➜</span>
+                                        <select
+                                            value={respuestas[preguntaActual.id]?.pares_relacionados?.[i]?.derecho || ''}
+                                            onChange={e => handlePar(preguntaActual.id, par.lado_izquierdo, e.target.value, i)}
+                                            style={{ padding: '0.55rem 0.9rem', border: '1px solid #e8e5de', borderRadius: '6px', fontSize: '0.95rem', background: 'white', color: '#1a1a1a', flex: 1, outline: 'none' }}>
+                                            <option value="">Seleccionar...</option>
+                                            {(derechosMezclados[preguntaActual.id] || preguntaActual.pares.map(p => p.lado_derecho)).map((derecho, idx) => (
+                                                <option key={idx} value={derecho}>{derecho}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Completar */}
+                        {preguntaActual.tipo === 'COMPLETAR' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {preguntaActual.espacios.map((esp, i) => (
+                                    <div key={esp.id} style={{
+                                        display: 'flex', alignItems: 'center', gap: '1rem',
+                                        background: '#f7f6f2', padding: '0.85rem 1rem',
+                                        borderRadius: '8px', border: '1px solid #e8e5de'
+                                    }}>
+                                        <span style={{ fontSize: '0.9rem', color: '#6b7280', minWidth: '90px', fontWeight: 600 }}>Espacio {esp.numero_espacio}:</span>
+                                        <input
+                                            placeholder="Escribe la palabra o frase"
+                                            value={respuestas[preguntaActual.id]?.espacios_respuestas?.[i] || ''}
+                                            onChange={e => handleEspacio(preguntaActual.id, e.target.value, i)}
+                                            style={{ padding: '0.55rem 0.9rem', border: '1px solid #e8e5de', borderRadius: '6px', fontSize: '0.95rem', background: 'white', color: '#1a1a1a', flex: 1, outline: 'none' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Botón siguiente / entregar */}
                     <button
-                        onClick={() => handleEntregar()}
+                        onClick={handleSiguiente}
                         disabled={entregando}
                         className="btn-primary"
                         style={{
-                            marginTop: '2.5rem', marginBottom: '3rem', padding: '1rem',
+                            marginBottom: '3rem', padding: '1rem',
                             fontSize: '1rem', width: '100%', fontWeight: 700,
                             letterSpacing: '0.5px', borderRadius: '10px',
                             opacity: entregando ? 0.6 : 1
                         }}>
-                        {entregando ? 'Entregando...' : 'Finalizar y Entregar Examen'}
+                        {entregando ? 'Entregando...' : esUltimaPregunta ? 'Finalizar y Entregar Examen' : 'Siguiente pregunta →'}
                     </button>
+
+                    <style>{`
+                        @keyframes pulse {
+                            0%, 100% { transform: scale(1); }
+                            50% { transform: scale(1.05); }
+                        }
+                    `}</style>
                 </div>
             </div>
         </div>

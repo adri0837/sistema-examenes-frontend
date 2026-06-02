@@ -41,7 +41,6 @@ export interface ExamenAdmin {
     titulo: string;
     descripcion: string | null;
     categoria: { id: string; nombre: string };
-    tiempo_limite_min: number | null;
     publicado: boolean;
     _count: { intentos: number };
 }
@@ -57,7 +56,6 @@ export interface ExamenDisponible {
     titulo: string;
     descripcion: string | null;
     categoria: { nombre: string };
-    tiempo_limite_min: number | null;
     _count: { preguntas: number };
     intento: IntentoResumen | null;
 }

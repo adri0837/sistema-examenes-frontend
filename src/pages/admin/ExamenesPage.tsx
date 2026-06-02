@@ -7,7 +7,7 @@ import './Admin.css';
 interface Categoria { id: string; nombre: string; }
 interface Examen {
     id: string; titulo: string; descripcion: string | null;
-    categoria: Categoria; tiempo_limite_min: number | null;
+    categoria: Categoria;
     publicado: boolean; _count: { intentos: number };
 }
 
@@ -20,7 +20,6 @@ const ExamenesPage = () => {
     const [titulo, setTitulo] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [categoria_id, setCategoriaId] = useState('');
-    const [tiempo, setTiempo] = useState('');
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(true);
 
@@ -39,14 +38,14 @@ const ExamenesPage = () => {
     useEffect(() => { cargarDatos(); }, []);
 
     const limpiarForm = () => {
-        setTitulo(''); setDescripcion(''); setCategoriaId(''); setTiempo('');
+        setTitulo(''); setDescripcion(''); setCategoriaId('');
         setMostrarForm(false); setEditando(null);
     };
 
     const handleCrear = async () => {
         try {
             setError('');
-            await api.post('/examenes', { titulo, descripcion, categoria_id, tiempo_limite_min: tiempo ? Number(tiempo) : null });
+            await api.post('/examenes', { titulo, descripcion, categoria_id });
             limpiarForm(); cargarDatos();
         } catch (e: any) {
             setError(e.response?.data?.message || 'Error al crear examen');
@@ -57,7 +56,7 @@ const ExamenesPage = () => {
         if (!editando) return;
         try {
             setError('');
-            await api.put(`/examenes/${editando.id}`, { titulo, descripcion, categoria_id, tiempo_limite_min: tiempo ? Number(tiempo) : null });
+            await api.put(`/examenes/${editando.id}`, { titulo, descripcion, categoria_id });
             limpiarForm(); cargarDatos();
         } catch (e: any) {
             setError(e.response?.data?.message || 'Error al editar examen');
@@ -89,7 +88,6 @@ const ExamenesPage = () => {
         setTitulo(ex.titulo);
         setDescripcion(ex.descripcion || '');
         setCategoriaId(ex.categoria.id);
-        setTiempo(ex.tiempo_limite_min ? String(ex.tiempo_limite_min) : '');
         setMostrarForm(false);
     };
 
@@ -128,10 +126,6 @@ const ExamenesPage = () => {
                                     {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                 </select>
                             </div>
-                            <div className="admin-form-group">
-                                <label>Tiempo límite (min)</label>
-                                <input type="number" placeholder="Dejar vacío = sin límite" value={tiempo} onChange={e => setTiempo(e.target.value)} style={{ maxWidth: '220px' }} />
-                            </div>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button onClick={editando ? handleEditar : handleCrear} className="btn-primary">
                                     {editando ? 'Guardar cambios' : 'Crear examen'}
@@ -151,7 +145,6 @@ const ExamenesPage = () => {
                                         <th>Título</th>
                                         <th>Descripción</th>
                                         <th>Categoría</th>
-                                        <th>Tiempo</th>
                                         <th>Estado</th>
                                         <th>Intentos</th>
                                         <th>Acciones</th>
@@ -160,7 +153,7 @@ const ExamenesPage = () => {
                                 <tbody>
                                     {examenes.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
                                                 No hay exámenes registrados
                                             </td>
                                         </tr>
@@ -172,7 +165,6 @@ const ExamenesPage = () => {
                                                 <td>
                                                     <span className="badge badge-info">{ex.categoria.nombre}</span>
                                                 </td>
-                                                <td style={{ color: '#6b7280' }}>{ex.tiempo_limite_min ? `${ex.tiempo_limite_min} min` : 'Sin límite'}</td>
                                                 <td>
                                                     <span className={`badge ${ex.publicado ? 'badge-active' : 'badge-inactive'}`}>
                                                         {ex.publicado ? 'Publicado' : 'Borrador'}

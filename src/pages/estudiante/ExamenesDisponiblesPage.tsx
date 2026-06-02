@@ -107,7 +107,6 @@ const ExamenesDisponiblesPage = () => {
                                         <th>Descripción</th>
                                         <th>Categoría</th>
                                         <th>Preguntas</th>
-                                        <th>Tiempo límite</th>
                                         <th>Estado</th>
                                         <th>Acción</th>
                                     </tr>
@@ -125,7 +124,6 @@ const ExamenesDisponiblesPage = () => {
                                                     </span>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>{examen._count.preguntas}</td>
-                                                <td>{examen.tiempo_limite_min ? `${examen.tiempo_limite_min} min` : 'Sin límite'}</td>
                                                 <td>{renderEstado(estado)}</td>
                                                 <td>{renderAccion(examen, estado)}</td>
                                             </tr>
