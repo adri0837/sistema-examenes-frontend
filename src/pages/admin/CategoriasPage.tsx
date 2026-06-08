@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
 import './Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Categoria {
     id: string;
@@ -18,6 +19,7 @@ const CategoriasPage = () => {
     const [descripcion, setDescripcion] = useState('');
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(true);
+    const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
 
     const cargarCategorias = async () => {
         try {
@@ -57,15 +59,20 @@ const CategoriasPage = () => {
         }
     };
 
-    const handleEliminar = async (id: string) => {
-        if (!window.confirm('¿Eliminar esta categoría?')) return;
-        try {
-            setError('');
-            await api.delete(`/categorias/${id}`);
-            cargarCategorias();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al eliminar categoría');
-        }
+    const handleEliminar = (id: string) => {
+        setDialog({
+            mensaje: '¿Eliminar esta categoría? Solo es posible si no tiene exámenes asociados.',
+            onConfirmar: async () => {
+                setDialog(null);
+                try {
+                    setError('');
+                    await api.delete(`/categorias/${id}`);
+                    cargarCategorias();
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al eliminar categoría');
+                }
+            }
+        });
     };
 
     const iniciarEdicion = (cat: Categoria) => {
@@ -169,6 +176,13 @@ const CategoriasPage = () => {
                     )}
                 </div>
             </div>
+            {dialog && (
+                <ConfirmDialog
+                    mensaje={dialog.mensaje}
+                    onConfirmar={dialog.onConfirmar}
+                    onCancelar={() => setDialog(null)}
+                />
+            )}
         </div>
     );
 };

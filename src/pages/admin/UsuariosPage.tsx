@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
 import './Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Usuario {
     id: string;
@@ -19,6 +20,7 @@ const UsuariosPage = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(true);
+    const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
 
     const cargarUsuarios = async () => {
         try {
@@ -55,15 +57,20 @@ const UsuariosPage = () => {
         }
     };
 
-    const handleEliminar = async (id: string) => {
-        if (!window.confirm('¿Eliminar permanentemente este estudiante?')) return;
-        try {
-            setError('');
-            await api.delete(`/usuarios/${id}`);
-            cargarUsuarios();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al eliminar usuario');
-        }
+    const handleEliminar = (id: string) => {
+        setDialog({
+            mensaje: '¿Eliminar permanentemente este estudiante? Esta acción no se puede deshacer.',
+            onConfirmar: async () => {
+                setDialog(null);
+                try {
+                    setError('');
+                    await api.delete(`/usuarios/${id}`);
+                    cargarUsuarios();
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al eliminar usuario');
+                }
+            }
+        });
     };
 
     return (
@@ -155,6 +162,13 @@ const UsuariosPage = () => {
                     )}
                 </div>
             </div>
+            {dialog && (
+                <ConfirmDialog
+                    mensaje={dialog.mensaje}
+                    onConfirmar={dialog.onConfirmar}
+                    onCancelar={() => setDialog(null)}
+                />
+            )}
         </div>
     );
 };

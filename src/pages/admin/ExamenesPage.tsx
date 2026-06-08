@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
 import './Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Categoria { id: string; nombre: string; }
 interface Examen {
@@ -22,6 +23,7 @@ const ExamenesPage = () => {
     const [categoria_id, setCategoriaId] = useState('');
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(true);
+    const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
 
     const cargarDatos = async () => {
         try {
@@ -63,15 +65,20 @@ const ExamenesPage = () => {
         }
     };
 
-    const handleEliminar = async (id: string) => {
-        if (!window.confirm('¿Eliminar este examen y todas sus preguntas?')) return;
-        try {
-            setError('');
-            await api.delete(`/examenes/${id}`);
-            cargarDatos();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al eliminar examen');
-        }
+    const handleEliminar = (id: string) => {
+        setDialog({
+            mensaje: '¿Eliminar este examen y todas sus preguntas? Esta acción no se puede deshacer.',
+            onConfirmar: async () => {
+                setDialog(null);
+                try {
+                    setError('');
+                    await api.delete(`/examenes/${id}`);
+                    cargarDatos();
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al eliminar examen');
+                }
+            }
+        });
     };
 
     const handleTogglePublicado = async (id: string) => {
@@ -199,6 +206,13 @@ const ExamenesPage = () => {
                     )}
                 </div>
             </div>
+            {dialog && (
+                <ConfirmDialog
+                    mensaje={dialog.mensaje}
+                    onConfirmar={dialog.onConfirmar}
+                    onCancelar={() => setDialog(null)}
+                />
+            )}
         </div>
     );
 };

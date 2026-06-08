@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
 import type { TipoPregunta, RespuestaEntrega } from '../../types';
 import '../admin/Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Opcion { id: string; texto: string; orden: number; }
 interface Par { id: string; lado_izquierdo: string; lado_derecho: string; }
@@ -27,6 +28,7 @@ const mezclar = <T,>(arr: T[]): T[] => {
 const ResponderExamenPage = () => {
     const { id: intento_id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [examen, setExamen] = useState<Examen | null>(null);
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
     const [respuestas, setRespuestas] = useState<Record<string, Partial<RespuestaEntrega>>>({});
@@ -36,6 +38,7 @@ const ResponderExamenPage = () => {
     const [entregando, setEntregando] = useState(false);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
+    const [dialogSalir, setDialogSalir] = useState(false);
     const entregandoRef = useRef(false);
     const avanzandoRef = useRef(false);
 
@@ -58,7 +61,6 @@ const ResponderExamenPage = () => {
                 if (data.examen?.id) {
                     localStorage.setItem(`intento_${data.examen.id}`, data.intento.id);
                 }
-                // Iniciar timer de la primera pregunta
                 if (data.preguntas[0]?.tiempo_limite_seg) {
                     setSegundosPregunta(data.preguntas[0].tiempo_limite_seg * 60);
                 } else {
@@ -72,6 +74,18 @@ const ResponderExamenPage = () => {
         };
         cargar();
     }, [intento_id]);
+
+    // Bloquear botón atrás del navegador
+    useEffect(() => {
+        if (entregado || cargando) return;
+        window.history.pushState(null, '', location.pathname);
+        const handlePop = () => {
+            window.history.pushState(null, '', location.pathname);
+            setDialogSalir(true);
+        };
+        window.addEventListener('popstate', handlePop);
+        return () => window.removeEventListener('popstate', handlePop);
+    }, [entregado, cargando, location.pathname]);
 
     const preguntaActual = preguntas[indicePregunta];
     const esUltimaPregunta = indicePregunta === preguntas.length - 1;
@@ -99,15 +113,12 @@ const ResponderExamenPage = () => {
     const avanzarPregunta = useCallback(() => {
         if (avanzandoRef.current) return;
         avanzandoRef.current = true;
-
         setIndicePregunta(prev => {
             const siguiente = prev + 1;
             if (siguiente >= preguntas.length) {
-                // Entregar
                 handleEntregar();
                 return prev;
             }
-            // Configurar timer de la siguiente pregunta
             const sigPregunta = preguntas[siguiente];
             setSegundosPregunta(sigPregunta.tiempo_limite_seg ? sigPregunta.tiempo_limite_seg * 60 : null);
             avanzandoRef.current = false;
@@ -115,7 +126,6 @@ const ResponderExamenPage = () => {
         });
     }, [preguntas, handleEntregar]);
 
-    // Timer por pregunta
     useEffect(() => {
         if (segundosPregunta === null || entregado || entregando || cargando) return;
         if (segundosPregunta <= 0) {
@@ -218,7 +228,6 @@ const ResponderExamenPage = () => {
                 <NavbarEstudiante />
                 <div className="admin-page-container" style={{ maxWidth: '680px', margin: '0 auto' }}>
 
-                    {/* Header */}
                     <div style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         background: 'white', padding: '1.1rem 1.5rem', borderRadius: '12px',
@@ -246,7 +255,6 @@ const ResponderExamenPage = () => {
                         )}
                     </div>
 
-                    {/* Barra de progreso */}
                     <div style={{ background: '#e8e5de', borderRadius: '99px', height: '6px', marginBottom: '1.5rem', overflow: 'hidden' }}>
                         <div style={{
                             background: '#16a34a', height: '100%', borderRadius: '99px',
@@ -257,7 +265,6 @@ const ResponderExamenPage = () => {
 
                     {error && <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca', textAlign: 'center' }}>{error}</p>}
 
-                    {/* Tarjeta de pregunta */}
                     <div style={{
                         background: 'white', border: '1px solid #e8e5de',
                         borderRadius: '16px', padding: '2rem',
@@ -278,7 +285,6 @@ const ResponderExamenPage = () => {
                             {preguntaActual.enunciado}
                         </p>
 
-                        {/* Opción múltiple */}
                         {preguntaActual.tipo === 'OPCION_MULTIPLE' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                                 <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Selecciona una o más opciones</p>
@@ -303,7 +309,6 @@ const ResponderExamenPage = () => {
                             </div>
                         )}
 
-                        {/* Verdadero / Falso */}
                         {preguntaActual.tipo === 'VERDADERO_FALSO' && (
                             <div style={{ display: 'flex', gap: '1rem' }}>
                                 {preguntaActual.opciones.map(opcion => {
@@ -327,7 +332,6 @@ const ResponderExamenPage = () => {
                             </div>
                         )}
 
-                        {/* Abierta */}
                         {preguntaActual.tipo === 'ABIERTA' && (
                             <textarea rows={5} placeholder="Escribe tu respuesta aquí..."
                                 value={respuestas[preguntaActual.id]?.texto_respuesta || ''}
@@ -343,7 +347,6 @@ const ResponderExamenPage = () => {
                             />
                         )}
 
-                        {/* Relacionar */}
                         {preguntaActual.tipo === 'RELACIONAR' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '0 0 0.4rem', fontWeight: 500 }}>Relaciona cada elemento con su par correcto</p>
@@ -369,7 +372,6 @@ const ResponderExamenPage = () => {
                             </div>
                         )}
 
-                        {/* Completar */}
                         {preguntaActual.tipo === 'COMPLETAR' && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {preguntaActual.espacios.map((esp, i) => (
@@ -391,7 +393,6 @@ const ResponderExamenPage = () => {
                         )}
                     </div>
 
-                    {/* Botón siguiente / entregar */}
                     <button
                         onClick={handleSiguiente}
                         disabled={entregando}
@@ -413,6 +414,20 @@ const ResponderExamenPage = () => {
                     `}</style>
                 </div>
             </div>
+
+            {dialogSalir && (
+                <ConfirmDialog
+                    tipo="warning"
+                    mensaje="Si sales ahora, el examen quedará bloqueado y no podrás volver a realizarlo."
+                    textoConfirmar="Sí, salir"
+                    textoCancelar="Continuar examen"
+                    onConfirmar={() => {
+                        setDialogSalir(false);
+                        navigate('/estudiante/examenes');
+                    }}
+                    onCancelar={() => setDialogSalir(false)}
+                />
+            )}
         </div>
     );
 };

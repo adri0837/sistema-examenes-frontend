@@ -4,6 +4,7 @@ import NavbarAdmin from '../../components/admin/NavbarAdmin';
 import api from '../../api/axios';
 import type { TipoPregunta } from '../../types';
 import './Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface Opcion { id?: string; texto: string; es_correcta: boolean; }
 interface Par { id?: string; lado_izquierdo: string; lado_derecho: string; }
@@ -28,6 +29,7 @@ const ExamenDetallePage = () => {
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
+    const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
     const [mostrarForm, setMostrarForm] = useState(false);
     const [editandoId, setEditandoId] = useState<string | null>(null);
     const [enunciado, setEnunciado] = useState('');
@@ -116,15 +118,20 @@ const ExamenDetallePage = () => {
         setMostrarForm(false); setError('');
     };
 
-    const handleEliminar = async (pregunta_id: string) => {
-        if (!window.confirm('¿Eliminar esta pregunta?')) return;
-        try {
-            setError('');
-            await api.delete(`/preguntas/${pregunta_id}`);
-            cargarPreguntas();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al eliminar pregunta');
-        }
+    const handleEliminar = (pregunta_id: string) => {
+        setDialog({
+            mensaje: '¿Eliminar esta pregunta? Esta acción no se puede deshacer.',
+            onConfirmar: async () => {
+                setDialog(null);
+                try {
+                    setError('');
+                    await api.delete(`/preguntas/${pregunta_id}`);
+                    cargarPreguntas();
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al eliminar pregunta');
+                }
+            }
+        });
     };
 
     const handleCambioTipo = (nuevoTipo: TipoPregunta) => {
@@ -345,6 +352,13 @@ const ExamenDetallePage = () => {
                     )}
                 </div>
             </div>
+            {dialog && (
+                <ConfirmDialog
+                    mensaje={dialog.mensaje}
+                    onConfirmar={dialog.onConfirmar}
+                    onCancelar={() => setDialog(null)}
+                />
+            )}
         </div>
     );
 };

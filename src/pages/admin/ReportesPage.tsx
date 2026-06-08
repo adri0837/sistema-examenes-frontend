@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatearCalificacion, limitarCalificacion } from '../../utils/calificacion';
 import './Admin.css';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 interface ExamenResumen { id: string; titulo: string; categoria: { nombre: string }; }
 interface EstudianteResumen { id: string; nombre: string; email: string; }
@@ -24,6 +25,7 @@ const ReportesPage = () => {
     const [reporte, setReporte] = useState<any>(null);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState('');
+    const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
 
     useEffect(() => {
         const cargar = async () => {
@@ -60,15 +62,20 @@ const ReportesPage = () => {
         }
     };
 
-    const darOportunidad = async (estudiante_id: string, examen_id: string) => {
-        if (!window.confirm('¿Dar una nueva oportunidad a este estudiante? Su intento anterior será eliminado.')) return;
-        try {
-            setError('');
-            await api.delete(`/admin/estudiantes/${estudiante_id}/examenes/${examen_id}/oportunidad`);
-            cargarReporte();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al dar oportunidad');
-        }
+    const darOportunidad = (estudiante_id: string, examen_id: string) => {
+        setDialog({
+            mensaje: '¿Dar una nueva oportunidad a este estudiante? Su intento anterior será eliminado.',
+            onConfirmar: async () => {
+                setDialog(null);
+                try {
+                    setError('');
+                    await api.delete(`/admin/estudiantes/${estudiante_id}/examenes/${examen_id}/oportunidad`);
+                    cargarReporte();
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al dar oportunidad');
+                }
+            }
+        });
     };
 
     const getTitulo = (): string => {
@@ -140,7 +147,6 @@ const ReportesPage = () => {
         <div className="admin-layout">
             <div className="admin-content-wrapper">
                 <NavbarAdmin />
-
                 <div className="admin-page-container">
                     <div className="admin-header-flex">
                         <h2>Reportes</h2>
@@ -236,7 +242,9 @@ const ReportesPage = () => {
                                                     <td>
                                                         {intento.estado === 'CALIFICADO'
                                                             ? <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>{formatearCalificacion(intento.calificacion_final)}</span>
-                                                            : <span className="badge badge-warning">En revisión</span>
+                                                            : intento.estado === 'EN_PROGRESO'
+                                                                ? <span className="badge badge-danger">Abandonado</span>
+                                                                : <span className="badge badge-warning">En revisión</span>
                                                         }
                                                     </td>
                                                     {tipoReporte === 'examen' && (
@@ -262,6 +270,13 @@ const ReportesPage = () => {
                     )}
                 </div>
             </div>
+            {dialog && (
+                <ConfirmDialog
+                    mensaje={dialog.mensaje}
+                    onConfirmar={dialog.onConfirmar}
+                    onCancelar={() => setDialog(null)}
+                />
+            )}
         </div>
     );
 };

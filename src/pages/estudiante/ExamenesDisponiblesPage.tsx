@@ -13,11 +13,6 @@ const getEstadoExamen = (intento: ExamenDisponible['intento']): 'disponible' | '
     return 'completado';
 };
 
-const obtenerIntentoId = (examen: ExamenDisponible): string | null => {
-    if (examen.intento?.id) return examen.intento.id;
-    return localStorage.getItem(intentoStorageKey(examen.id));
-};
-
 const ExamenesDisponiblesPage = () => {
     const navigate = useNavigate();
     const [examenes, setExamenes] = useState<ExamenDisponible[]>([]);
@@ -51,31 +46,15 @@ const ExamenesDisponiblesPage = () => {
         }
     };
 
-    const handleContinuar = (examen: ExamenDisponible) => {
-        const intentoId = obtenerIntentoId(examen);
-        if (intentoId) {
-            navigate(`/estudiante/examenes/${intentoId}`);
-        } else {
-            setError('No se pudo reanudar el examen. Contacta al administrador.');
-        }
-    };
-
     const renderEstado = (estado: ReturnType<typeof getEstadoExamen>) => {
         if (estado === 'completado') return <span className="badge badge-active">Completado</span>;
-        if (estado === 'en_progreso') return <span className="badge badge-warning">En progreso</span>;
+        if (estado === 'en_progreso') return <span className="badge badge-danger">Abandonado</span>;
         return <span className="badge badge-info">Disponible</span>;
     };
 
     const renderAccion = (examen: ExamenDisponible, estado: ReturnType<typeof getEstadoExamen>) => {
-        if (estado === 'completado') {
+        if (estado === 'completado' || estado === 'en_progreso') {
             return <span style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No disponible</span>;
-        }
-        if (estado === 'en_progreso') {
-            return (
-                <button onClick={() => handleContinuar(examen)} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '13px' }}>
-                    Continuar examen
-                </button>
-            );
         }
         return (
             <button onClick={() => handleIniciar(examen.id)} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '13px' }}>
