@@ -7,7 +7,7 @@ export type TipoPregunta =
     | 'RELACIONAR'
     | 'COMPLETAR';
 
-export type EstadoIntento = 'EN_PROGRESO' | 'ENTREGADO' | 'CALIFICADO';
+export type EstadoIntento = 'EN_PROGRESO' | 'ENTREGADO' | 'CALIFICADO' | 'CANCELADO';
 
 export interface Usuario {
     id: string;
@@ -66,4 +66,48 @@ export interface RespuestaEntrega {
     opciones_seleccionadas?: string[];
     pares_relacionados?: { izquierdo: string; derecho: string }[];
     espacios_respuestas?: string[];
+}
+
+// ── Supervisión (Proctoring) ───────────────────────────────
+
+export type IncidenteTipo =
+    | 'SIN_CAMARA'
+    | 'SIN_MICRO'
+    | 'SIN_PERMISOS'
+    | 'CAMBIO_VENTANA'
+    | 'CIERRE_NAVEGADOR'
+    | 'SALIR_PANTALLA_COMPLETA'
+    | 'MOVIMIENTO_SOSPECHOSO'
+    | 'RUIDO_SOSPECHOSO'
+    | 'COPIA';
+
+export interface IncidenteSupervision {
+    id: string;
+    intento_id: string;
+    tipo: IncidenteTipo;
+    descripcion?: string;
+    creado_en: string;
+}
+
+export interface ProctoringState {
+    permisoCamara: 'pending' | 'granted' | 'denied';
+    permisoMicro: 'pending' | 'granted' | 'denied';
+    fullscreenActivo: boolean;
+    strikesRestantes: number;
+    calibrando: boolean;
+    calibracionProgreso: number;
+    blurAdvertencias: number;
+    error: string | null;
+    /** 0.0-1.0 normalized pixel diff from baseline (live) */
+    nivelMovimiento: number;
+    /** 0.0-1.0 normalized audio RMS level (live) */
+    nivelAudio: number;
+}
+
+export interface UseProctoringOptions {
+    intentoId: string;
+    supervisionActiva: boolean;
+    onCancelado: (motivo: string) => void;
+    version?: number;
+    stream?: MediaStream | null;
 }

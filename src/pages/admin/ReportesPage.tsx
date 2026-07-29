@@ -244,7 +244,9 @@ const ReportesPage = () => {
                                                             ? <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>{formatearCalificacion(intento.calificacion_final)}</span>
                                                             : intento.estado === 'EN_PROGRESO'
                                                                 ? <span className="badge badge-danger">Abandonado</span>
-                                                                : <span className="badge badge-warning">En revisión</span>
+                                                                : intento.estado === 'CANCELADO'
+                                                                    ? <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>Cancelado</span>
+                                                                    : <span className="badge badge-warning">En revisión</span>
                                                         }
                                                     </td>
                                                     {tipoReporte === 'examen' && (

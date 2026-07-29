@@ -9,7 +9,7 @@ interface Categoria { id: string; nombre: string; }
 interface Examen {
     id: string; titulo: string; descripcion: string | null;
     categoria: Categoria;
-    publicado: boolean; _count: { intentos: number };
+    publicado: boolean; supervision_activa: boolean; _count: { intentos: number };
 }
 
 const ExamenesPage = () => {
@@ -21,6 +21,7 @@ const ExamenesPage = () => {
     const [titulo, setTitulo] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [categoria_id, setCategoriaId] = useState('');
+    const [supervisionActiva, setSupervisionActiva] = useState(false);
     const [error, setError] = useState('');
     const [cargando, setCargando] = useState(true);
     const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
@@ -40,14 +41,14 @@ const ExamenesPage = () => {
     useEffect(() => { cargarDatos(); }, []);
 
     const limpiarForm = () => {
-        setTitulo(''); setDescripcion(''); setCategoriaId('');
+        setTitulo(''); setDescripcion(''); setCategoriaId(''); setSupervisionActiva(false);
         setMostrarForm(false); setEditando(null);
     };
 
     const handleCrear = async () => {
         try {
             setError('');
-            await api.post('/examenes', { titulo, descripcion, categoria_id });
+            await api.post('/examenes', { titulo, descripcion, categoria_id, supervision_activa: supervisionActiva });
             limpiarForm(); cargarDatos();
         } catch (e: any) {
             setError(e.response?.data?.message || 'Error al crear examen');
@@ -58,21 +59,24 @@ const ExamenesPage = () => {
         if (!editando) return;
         try {
             setError('');
-            await api.put(`/examenes/${editando.id}`, { titulo, descripcion, categoria_id });
+            await api.put(`/examenes/${editando.id}`, { titulo, descripcion, categoria_id, supervision_activa: supervisionActiva });
             limpiarForm(); cargarDatos();
         } catch (e: any) {
             setError(e.response?.data?.message || 'Error al editar examen');
         }
     };
 
-    const handleEliminar = (id: string) => {
+    const handleEliminar = (ex: Examen) => {
+        const tieneIntentos = ex._count.intentos > 0;
         setDialog({
-            mensaje: '¿Eliminar este examen y todas sus preguntas? Esta acción no se puede deshacer.',
+            mensaje: tieneIntentos
+                ? `Este examen tiene ${ex._count.intentos} intento(s) de estudiantes. ¿Eliminar también los intentos y todas las preguntas? Esta acción no se puede deshacer.`
+                : '¿Eliminar este examen y todas sus preguntas? Esta acción no se puede deshacer.',
             onConfirmar: async () => {
                 setDialog(null);
                 try {
                     setError('');
-                    await api.delete(`/examenes/${id}`);
+                    await api.delete(`/examenes/${ex.id}`);
                     cargarDatos();
                 } catch (e: any) {
                     setError(e.response?.data?.message || 'Error al eliminar examen');
@@ -95,6 +99,7 @@ const ExamenesPage = () => {
         setTitulo(ex.titulo);
         setDescripcion(ex.descripcion || '');
         setCategoriaId(ex.categoria.id);
+        setSupervisionActiva(ex.supervision_activa);
         setMostrarForm(false);
     };
 
@@ -133,6 +138,14 @@ const ExamenesPage = () => {
                                     {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                 </select>
                             </div>
+                            <div className="admin-form-group">
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', textTransform: 'none', letterSpacing: 0, fontWeight: 500, color: '#1a1a1a' }}>
+                                    <input type="checkbox" checked={supervisionActiva}
+                                        onChange={e => setSupervisionActiva(e.target.checked)}
+                                        style={{ accentColor: '#16a34a', transform: 'scale(1.2)' }} />
+                                    Activar supervisión (cámara + micrófono + monitoreo)
+                                </label>
+                            </div>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button onClick={editando ? handleEditar : handleCrear} className="btn-primary">
                                     {editando ? 'Guardar cambios' : 'Crear examen'}
@@ -153,6 +166,7 @@ const ExamenesPage = () => {
                                         <th>Descripción</th>
                                         <th>Categoría</th>
                                         <th>Estado</th>
+                                        <th>Supervisión</th>
                                         <th>Intentos</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -160,7 +174,7 @@ const ExamenesPage = () => {
                                 <tbody>
                                     {examenes.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
+                                            <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '3rem' }}>
                                                 No hay exámenes registrados
                                             </td>
                                         </tr>
@@ -177,19 +191,22 @@ const ExamenesPage = () => {
                                                         {ex.publicado ? 'Publicado' : 'Borrador'}
                                                     </span>
                                                 </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    {ex.supervision_activa
+                                                        ? <span className="badge badge-warning">📷 Activa</span>
+                                                        : <span className="badge badge-inactive">—</span>}
+                                                </td>
                                                 <td style={{ textAlign: 'center', color: '#6b7280' }}>{ex._count.intentos}</td>
                                                 <td style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                     <button onClick={() => navigate(`/admin/examenes/${ex.id}`)} className="btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}>
                                                         Preguntas
                                                     </button>
-                                                    <button onClick={() => iniciarEdicion(ex)} disabled={ex._count.intentos > 0}
-                                                        className="action-btn"
-                                                        style={{ opacity: ex._count.intentos > 0 ? 0.4 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                    <button onClick={() => iniciarEdicion(ex)}
+                                                        className="action-btn">
                                                         Editar
                                                     </button>
-                                                    <button onClick={() => handleEliminar(ex.id)} disabled={ex._count.intentos > 0}
-                                                        className="action-btn btn-danger"
-                                                        style={{ opacity: ex._count.intentos > 0 ? 0.4 : 1, cursor: ex._count.intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                    <button onClick={() => handleEliminar(ex)}
+                                                        className="action-btn btn-danger">
                                                         Eliminar
                                                     </button>
                                                     <button onClick={() => handleTogglePublicado(ex.id)}

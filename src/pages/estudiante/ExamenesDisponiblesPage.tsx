@@ -7,9 +7,10 @@ import '../admin/Admin.css';
 
 const intentoStorageKey = (examenId: string) => `intento_${examenId}`;
 
-const getEstadoExamen = (intento: ExamenDisponible['intento']): 'disponible' | 'en_progreso' | 'completado' => {
+const getEstadoExamen = (intento: ExamenDisponible['intento']): 'disponible' | 'en_progreso' | 'completado' | 'cancelado' => {
     if (!intento) return 'disponible';
     if (intento.estado === 'EN_PROGRESO') return 'en_progreso';
+    if (intento.estado === 'CANCELADO') return 'cancelado';
     return 'completado';
 };
 
@@ -49,11 +50,12 @@ const ExamenesDisponiblesPage = () => {
     const renderEstado = (estado: ReturnType<typeof getEstadoExamen>) => {
         if (estado === 'completado') return <span className="badge badge-active">Completado</span>;
         if (estado === 'en_progreso') return <span className="badge badge-danger">Abandonado</span>;
+        if (estado === 'cancelado') return <span className="badge badge-warning">Cancelado</span>;
         return <span className="badge badge-info">Disponible</span>;
     };
 
     const renderAccion = (examen: ExamenDisponible, estado: ReturnType<typeof getEstadoExamen>) => {
-        if (estado === 'completado' || estado === 'en_progreso') {
+        if (estado === 'completado' || estado === 'en_progreso' || estado === 'cancelado') {
             return <span style={{ fontSize: '13px', color: '#64748b', fontStyle: 'italic' }}>No disponible</span>;
         }
         return (

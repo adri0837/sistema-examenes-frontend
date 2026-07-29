@@ -1,0 +1,333 @@
+/* ── Permission Gate ───────────────────────────────────── */
+.proctoring-permission-overlay {
+    position: fixed;
+    inset: 0;
+    background: #f7f6f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.proctoring-permission-card {
+    background: white;
+    border: 1px solid #e8e5de;
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    max-width: 460px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+.proctoring-permission-card h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin: 0 0 0.5rem;
+}
+
+.proctoring-permission-card p {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem;
+    line-height: 1.5;
+}
+
+.proctoring-permission-camera-preview {
+    width: 240px;
+    height: 180px;
+    border-radius: 12px;
+    background: #e8e5de;
+    object-fit: cover;
+    margin: 0 auto 1.5rem;
+    display: block;
+    border: 2px solid #e8e5de;
+}
+
+.proctoring-permission-icons {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.proctoring-permission-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.proctoring-permission-icon .icon {
+    font-size: 2rem;
+}
+
+.proctoring-permission-icon.granted .icon {
+    color: #16a34a;
+}
+
+.proctoring-permission-icon.denied .icon {
+    color: #dc2626;
+}
+
+/* ── Proctoring Bar ────────────────────────────────────── */
+.proctoring-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #1a1a1a;
+    color: white;
+    padding: 0.55rem 1.5rem;
+    font-size: 0.82rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    gap: 1rem;
+}
+
+.proctoring-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.proctoring-bar-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 500;
+}
+
+.proctoring-bar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.proctoring-bar-dot.active {
+    background: #16a34a;
+    box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);
+}
+
+.proctoring-bar-dot.inactive {
+    background: #6b7280;
+}
+
+.proctoring-bar-dot.error {
+    background: #dc2626;
+    animation: pulse 0.8s infinite;
+}
+
+.proctoring-bar-label {
+    color: #9ca3af;
+    font-size: 0.78rem;
+}
+
+/* ── Live indicators (motion/audio bars) ──────────────────── */
+.proctoring-bar-live {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.proctoring-live-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.proctoring-live-bar {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+    background: #374151;
+    transition: width 0.3s ease, background 0.2s ease;
+}
+
+.proctoring-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.proctoring-live-dot.ok {
+    background: #16a34a;
+}
+
+.proctoring-live-dot.warn {
+    background: #d97706;
+}
+
+.proctoring-live-dot.alert {
+    background: #dc2626;
+    animation: pulse 0.8s infinite;
+}
+
+.proctoring-bar-strikes {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.proctoring-strike-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #374151;
+    display: inline-block;
+}
+
+.proctoring-strike-dot.live {
+    border-color: #16a34a;
+    background: #16a34a;
+}
+
+.proctoring-strike-dot.warning {
+    border-color: #d97706;
+    background: #d97706;
+}
+
+.proctoring-strike-dot.lost {
+    border-color: #374151;
+    background: transparent;
+}
+
+/* ── Config Modal (calibration) ─────────────────────────── */
+.proctoring-calibration-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.proctoring-calibration-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+}
+
+.proctoring-calibration-card h2 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin: 0 0 0.5rem;
+}
+
+.proctoring-calibration-card p {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+}
+
+.proctoring-calibration-countdown {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #16a34a;
+    margin: 1rem 0;
+}
+
+.proctoring-calibration-progress {
+    width: 100%;
+    height: 6px;
+    background: #e8e5de;
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.proctoring-calibration-progress-bar {
+    height: 100%;
+    background: #16a34a;
+    border-radius: 99px;
+    transition: width 0.3s ease;
+}
+
+.proctoring-calibration-video-wrapper {
+    position: relative;
+    width: 200px;
+    height: 150px;
+    margin: 0 auto 1rem;
+}
+
+.proctoring-calibration-feed {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    background: #e8e5de;
+    object-fit: cover;
+    display: block;
+}
+
+.proctoring-calibration-face-guide {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    pointer-events: none;
+    background:
+        radial-gradient(
+            ellipse 50% 55% at 50% 45%,
+            transparent 0%,
+            transparent 62%,
+            rgba(22, 163, 74, 0.25) 63%,
+            rgba(22, 163, 74, 0.25) 68%,
+            transparent 69%
+        );
+}
+
+/* ── Cancel Screen ─────────────────────────────────────── */
+.proctoring-cancel-overlay {
+    position: fixed;
+    inset: 0;
+    background: #fef2f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.proctoring-cancel-card {
+    background: white;
+    border: 1px solid #fecaca;
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+.proctoring-cancel-card .icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+}
+
+.proctoring-cancel-card h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #dc2626;
+    margin: 0 0 0.5rem;
+}
+
+.proctoring-cancel-card p {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem;
+    line-height: 1.5;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}

@@ -27,7 +27,9 @@ const ExamenDetallePage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
+    const [intentos, setIntentos] = useState(0);
     const [cargando, setCargando] = useState(true);
+    const [reseteando, setReseteando] = useState(false);
     const [error, setError] = useState('');
     const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
     const [mostrarForm, setMostrarForm] = useState(false);
@@ -44,7 +46,8 @@ const ExamenDetallePage = () => {
         if (!id) return;
         try {
             const { data } = await api.get(`/examenes/${id}/preguntas`);
-            setPreguntas(data);
+            setPreguntas(data.preguntas ?? data);
+            setIntentos(data.intentos ?? 0);
         } catch {
             setError('Error al cargar preguntas');
         } finally {
@@ -76,6 +79,7 @@ const ExamenDetallePage = () => {
     };
 
     const handleCrear = async () => {
+        if (intentos > 0) { setError('No se puede agregar preguntas a un examen con intentos. Primero resetea los intentos.'); return; }
         const v = validarForm(); if (v) { setError(v); return; }
         try {
             setError('');
@@ -93,6 +97,7 @@ const ExamenDetallePage = () => {
     };
 
     const handleEditar = async () => {
+        if (intentos > 0) { setError('No se puede editar preguntas de un examen con intentos. Primero resetea los intentos.'); return; }
         const v = validarForm(); if (v) { setError(v); return; }
         try {
             setError('');
@@ -118,7 +123,30 @@ const ExamenDetallePage = () => {
         setMostrarForm(false); setError('');
     };
 
+    const handleResetearIntentos = () => {
+        setDialog({
+            mensaje: `¿Eliminar todos los ${intentos} intento(s) de este examen? Los estudiantes podrán volver a rendirlo. Esta acción no se puede deshacer.`,
+            onConfirmar: async () => {
+                setDialog(null);
+                setReseteando(true);
+                try {
+                    setError('');
+                    await api.delete(`/examenes/${id}/intentos`);
+                    setIntentos(0);
+                } catch (e: any) {
+                    setError(e.response?.data?.message || 'Error al resetear intentos');
+                } finally {
+                    setReseteando(false);
+                }
+            }
+        });
+    };
+
     const handleEliminar = (pregunta_id: string) => {
+        if (intentos > 0) {
+            setError('No se puede eliminar preguntas de un examen con intentos. Primero resetea los intentos.');
+            return;
+        }
         setDialog({
             mensaje: '¿Eliminar esta pregunta? Esta acción no se puede deshacer.',
             onConfirmar: async () => {
@@ -254,7 +282,12 @@ const ExamenDetallePage = () => {
                             <h2>Preguntas del examen</h2>
                         </div>
                         {!editandoId && (
-                            <button onClick={() => { setMostrarForm(!mostrarForm); setError(''); }} className="btn-primary">
+                            <button onClick={() => {
+                                if (intentos > 0) { setError('No se puede agregar preguntas a un examen con intentos. Primero resetea los intentos.'); return; }
+                                setMostrarForm(!mostrarForm); setError('');
+                            }}
+                                className="btn-primary"
+                                style={{ opacity: intentos > 0 ? 0.5 : 1, cursor: intentos > 0 ? 'not-allowed' : 'pointer' }}>
                                 {mostrarForm ? 'Cancelar' : '+ Nueva pregunta'}
                             </button>
                         )}
@@ -264,6 +297,22 @@ const ExamenDetallePage = () => {
                         <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '1rem', background: '#fef2f2', padding: '0.6rem 0.9rem', borderRadius: '6px', border: '1px solid #fecaca' }}>
                             {error}
                         </p>
+                    )}
+
+                    {intentos > 0 && (
+                        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1.25rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <div>
+                                <span style={{ fontWeight: 700, color: '#92400e', fontSize: '0.9rem' }}>⚠️ Este examen tiene {intentos} intento(s) de estudiantes.</span>
+                                <p style={{ margin: '4px 0 0', color: '#a16207', fontSize: '0.82rem' }}>
+                                    Para agregar, editar o eliminar preguntas, primero debes resetear los intentos.
+                                </p>
+                            </div>
+                            <button onClick={handleResetearIntentos} disabled={reseteando}
+                                className="action-btn btn-danger"
+                                style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                {reseteando ? 'Reseteando...' : `Resetear ${intentos} intento(s)`}
+                            </button>
+                        </div>
                     )}
 
                     {(mostrarForm || editandoId) && (
@@ -340,8 +389,19 @@ const ExamenDetallePage = () => {
                                                 <td style={{ color: '#6b7280' }}>{p.puntaje} pts</td>
                                                 <td style={{ color: '#6b7280' }}>{p.tiempo_limite_seg ? `${p.tiempo_limite_seg} min` : '—'}</td>
                                                 <td style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    <button onClick={() => iniciarEdicion(p)} className="action-btn">Editar</button>
-                                                    <button onClick={() => handleEliminar(p.id)} className="action-btn btn-danger">Eliminar</button>
+                                                    <button onClick={() => {
+                                                        if (intentos > 0) { setError('No se puede editar preguntas de un examen con intentos. Primero resetea los intentos.'); return; }
+                                                        iniciarEdicion(p);
+                                                    }}
+                                                        className="action-btn"
+                                                        style={{ opacity: intentos > 0 ? 0.4 : 1, cursor: intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                        Editar
+                                                    </button>
+                                                    <button onClick={() => handleEliminar(p.id)}
+                                                        className="action-btn btn-danger"
+                                                        style={{ opacity: intentos > 0 ? 0.4 : 1, cursor: intentos > 0 ? 'not-allowed' : 'pointer' }}>
+                                                        Eliminar
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))

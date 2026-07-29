@@ -3,6 +3,12 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
 import type { TipoPregunta, RespuestaEntrega } from '../../types';
+import useProctoring from '../../hooks/useProctoring';
+import { useTimer } from '../../hooks/useTimer';
+import PermissionGate from '../../components/estudiante/PermissionGate';
+import ProctoringBar from '../../components/estudiante/ProctoringBar';
+import ExamenCancelado from '../../components/estudiante/ExamenCancelado';
+import ProctoringConfigModal from '../../components/estudiante/ProctoringConfigModal';
 import '../admin/Admin.css';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -33,7 +39,6 @@ const ResponderExamenPage = () => {
     const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
     const [respuestas, setRespuestas] = useState<Record<string, Partial<RespuestaEntrega>>>({});
     const [indicePregunta, setIndicePregunta] = useState(0);
-    const [segundosPregunta, setSegundosPregunta] = useState<number | null>(null);
     const [entregado, setEntregado] = useState(false);
     const [entregando, setEntregando] = useState(false);
     const [cargando, setCargando] = useState(true);
@@ -41,6 +46,23 @@ const ResponderExamenPage = () => {
     const [dialogSalir, setDialogSalir] = useState(false);
     const entregandoRef = useRef(false);
     const avanzandoRef = useRef(false);
+
+    // ── Supervisión ───────────────────────────────────────
+    const [supervisionActiva, setSupervisionActiva] = useState(false);
+    const [cancelado, setCancelado] = useState<string | null>(null);
+    const [dialogFullscreen, setDialogFullscreen] = useState(false);
+    const [streamMedia, setStreamMedia] = useState<MediaStream | null>(null);
+    const [mostrarGate, setMostrarGate] = useState(true);
+    const fullscreenWarningShown = useRef(false);
+    const [dialogBlur, setDialogBlur] = useState(false);
+    const blurAdvertenciasAnterior = useRef(0);
+
+    const proctoringState = useProctoring({
+        intentoId: intento_id!,
+        supervisionActiva,
+        onCancelado: (motivo) => setCancelado(motivo),
+        stream: streamMedia,
+    });
 
     const derechosMezclados = useMemo(() => {
         const mapa: Record<string, string[]> = {};
@@ -58,14 +80,13 @@ const ResponderExamenPage = () => {
                 const { data } = await api.get(`/estudiante/intentos/${intento_id}`);
                 setExamen(data.examen);
                 setPreguntas(data.preguntas);
+                if (data.examen?.supervision_activa) {
+                    setSupervisionActiva(true);
+                }
                 if (data.examen?.id) {
                     localStorage.setItem(`intento_${data.examen.id}`, data.intento.id);
                 }
-                if (data.preguntas[0]?.tiempo_limite_seg) {
-                    setSegundosPregunta(data.preguntas[0].tiempo_limite_seg * 60);
-                } else {
-                    setSegundosPregunta(null);
-                }
+                // Timer se inicia cuando termina la calibración (no acá)
             } catch {
                 setError('Error al cargar el examen. Puede que ya haya sido entregado.');
             } finally {
@@ -86,6 +107,30 @@ const ResponderExamenPage = () => {
         window.addEventListener('popstate', handlePop);
         return () => window.removeEventListener('popstate', handlePop);
     }, [entregado, cargando, location.pathname]);
+
+    // Detectar salida de pantalla completa → advertencia
+    const fullscreenAlgunaVez = useRef(false);
+    useEffect(() => {
+        if (!supervisionActiva || cancelado) return;
+        if (proctoringState.fullscreenActivo) {
+            fullscreenAlgunaVez.current = true;
+            return;
+        }
+        // Solo mostrar advertencia si alguna vez estuvo en fullscreen
+        if (!fullscreenAlgunaVez.current) return;
+        if (fullscreenWarningShown.current) return;
+        fullscreenWarningShown.current = true;
+        setDialogFullscreen(true);
+    }, [supervisionActiva, proctoringState.fullscreenActivo, cancelado]);
+
+    // Detectar pérdida de foco (Windows+Tab, Alt+Tab) → advertencia tipo "como con esc y f11"
+    useEffect(() => {
+        if (!supervisionActiva || cancelado || proctoringState.blurAdvertencias === 0) return;
+        // Solo reaccionar cuando el contador sube (evita bucles)
+        if (proctoringState.blurAdvertencias <= blurAdvertenciasAnterior.current) return;
+        blurAdvertenciasAnterior.current = proctoringState.blurAdvertencias;
+        setDialogBlur(true);
+    }, [supervisionActiva, proctoringState.blurAdvertencias, cancelado]);
 
     const preguntaActual = preguntas[indicePregunta];
     const esUltimaPregunta = indicePregunta === preguntas.length - 1;
@@ -119,24 +164,25 @@ const ResponderExamenPage = () => {
                 handleEntregar();
                 return prev;
             }
-            const sigPregunta = preguntas[siguiente];
-            setSegundosPregunta(sigPregunta.tiempo_limite_seg ? sigPregunta.tiempo_limite_seg * 60 : null);
             avanzandoRef.current = false;
             return siguiente;
         });
     }, [preguntas, handleEntregar]);
 
-    useEffect(() => {
-        if (segundosPregunta === null || entregado || entregando || cargando) return;
-        if (segundosPregunta <= 0) {
-            avanzarPregunta();
-            return;
-        }
-        const timer = setInterval(() => {
-            setSegundosPregunta(prev => (prev !== null && prev > 1 ? prev - 1 : 0));
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [segundosPregunta, entregado, entregando, cargando]);
+    // ── Timer: hook independiente con Date.now absoluto ──
+    const timerSeconds = useMemo(() => {
+        if (cargando || entregado || entregando) return null;
+        if (supervisionActiva && proctoringState.calibrando) return null;
+        const t = preguntas[indicePregunta]?.tiempo_limite_seg;
+        return t ? t * 60 : null;
+    }, [preguntas, indicePregunta, supervisionActiva, proctoringState.calibrando, cargando, entregado, entregando]);
+
+    const segundosPregunta = useTimer({
+        seconds: timerSeconds,
+        running: timerSeconds !== null && !entregado && !entregando,
+        onExpire: avanzarPregunta,
+        questionKey: String(indicePregunta),
+    });
 
     const handleSiguiente = () => {
         avanzandoRef.current = false;
@@ -183,11 +229,38 @@ const ResponderExamenPage = () => {
         });
     };
 
+    // ── Supervisión guards ────────────────────────────────
+    if (cancelado) return <ExamenCancelado motivo={cancelado} />;
+
+    if (supervisionActiva && mostrarGate) {
+        return (
+            <PermissionGate
+                onPermisosConcedidos={(stream) => {
+                    setStreamMedia(stream);
+                    setMostrarGate(false);
+                }}
+                onDenegado={() => setCancelado('Permisos denegados')}
+            />
+        );
+    }
+
+    if (supervisionActiva && proctoringState.calibrando) {
+        return (
+            <div className="admin-layout">
+                <ProctoringConfigModal
+                    progreso={proctoringState.calibracionProgreso}
+                    stream={streamMedia}
+                    error={proctoringState.error}
+                />
+            </div>
+        );
+    }
+
     if (entregado) {
         return (
             <div className="admin-layout">
                 <div className="admin-content-wrapper">
-                    <NavbarEstudiante />
+                    {!supervisionActiva && <NavbarEstudiante />}
                     <div className="admin-page-container" style={{ textAlign: 'center', marginTop: '8vh' }}>
                         <div style={{ background: 'white', border: '1px solid #e8e5de', borderRadius: '20px', padding: '4rem', maxWidth: '480px', margin: '0 auto', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
                             <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>✅</div>
@@ -224,8 +297,9 @@ const ResponderExamenPage = () => {
 
     return (
         <div className="admin-layout">
+            {supervisionActiva && <ProctoringBar state={proctoringState} />}
             <div className="admin-content-wrapper">
-                <NavbarEstudiante />
+                {!supervisionActiva && <NavbarEstudiante />}
                 <div className="admin-page-container" style={{ maxWidth: '680px', margin: '0 auto' }}>
 
                     <div style={{
@@ -426,6 +500,40 @@ const ResponderExamenPage = () => {
                         navigate('/estudiante/examenes');
                     }}
                     onCancelar={() => setDialogSalir(false)}
+                />
+            )}
+
+            {dialogFullscreen && (
+                <ConfirmDialog
+                    tipo="warning"
+                    mensaje="Si sales del modo de pantalla completa, el examen será cancelado."
+                    textoConfirmar="Salir y cancelar"
+                    textoCancelar="Volver a pantalla completa"
+                    onConfirmar={() => {
+                        setDialogFullscreen(false);
+                        setCancelado('Saliste del modo de pantalla completa');
+                    }}
+                    onCancelar={async () => {
+                        setDialogFullscreen(false);
+                        fullscreenWarningShown.current = false;
+                        try { await document.documentElement.requestFullscreen(); } catch {}
+                    }}
+                />
+            )}
+
+            {dialogBlur && (
+                <ConfirmDialog
+                    tipo="warning"
+                    mensaje="La ventana del examen perdió el foco. Si cambiás de ventana o pestaña, el examen será cancelado automáticamente."
+                    textoConfirmar="Entendido, continuar"
+                    textoCancelar="Cancelar examen"
+                    onConfirmar={() => {
+                        setDialogBlur(false);
+                    }}
+                    onCancelar={() => {
+                        setDialogBlur(false);
+                        setCancelado('Cambio de ventana detectado');
+                    }}
                 />
             )}
         </div>
