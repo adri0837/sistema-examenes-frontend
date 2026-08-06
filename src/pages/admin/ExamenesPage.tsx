@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import './Admin.css';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -50,8 +50,8 @@ const ExamenesPage = () => {
             setError('');
             await api.post('/examenes', { titulo, descripcion, categoria_id, supervision_activa: supervisionActiva });
             limpiarForm(); cargarDatos();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al crear examen');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al crear examen'));
         }
     };
 
@@ -61,8 +61,8 @@ const ExamenesPage = () => {
             setError('');
             await api.put(`/examenes/${editando.id}`, { titulo, descripcion, categoria_id, supervision_activa: supervisionActiva });
             limpiarForm(); cargarDatos();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al editar examen');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al editar examen'));
         }
     };
 
@@ -78,8 +78,8 @@ const ExamenesPage = () => {
                     setError('');
                     await api.delete(`/examenes/${ex.id}`);
                     cargarDatos();
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al eliminar examen');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al eliminar examen'));
                 }
             }
         });
@@ -89,8 +89,8 @@ const ExamenesPage = () => {
         try {
             await api.patch(`/examenes/${id}/toggle-publicado`);
             cargarDatos();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al actualizar examen');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al actualizar examen'));
         }
     };
 

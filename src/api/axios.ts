@@ -1,4 +1,12 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
+
+export const obtenerMensajeError = (e: unknown, fallback: string): string => {
+    if (isAxiosError(e)) {
+        const mensaje = (e.response?.data as { message?: string } | undefined)?.message;
+        if (mensaje) return mensaje;
+    }
+    return fallback;
+};
 
 const api = axios.create({
     baseURL: 'http://localhost:3000/api',

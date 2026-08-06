@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import './Admin.css';
 
 interface RespuestaAbierta {
@@ -55,8 +55,8 @@ const RevisionPage = () => {
             await api.patch(`/revision/respuestas/${respuesta_id}`, { puntaje_obtenido: puntaje });
             setPuntajes(prev => { const n = { ...prev }; delete n[respuesta_id]; return n; });
             cargarPendientes();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al calificar respuesta');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al calificar respuesta'));
         }
     };
 
