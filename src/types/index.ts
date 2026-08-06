@@ -7,7 +7,7 @@ export type TipoPregunta =
     | 'RELACIONAR'
     | 'COMPLETAR';
 
-export type EstadoIntento = 'EN_PROGRESO' | 'ENTREGADO' | 'CALIFICADO' | 'CANCELADO';
+export type EstadoIntento = 'EN_PROGRESO' | 'ENTREGADO' | 'CALIFICADO' | 'CANCELADO' | 'REPROBADO';
 
 export interface Usuario {
     id: string;
@@ -49,6 +49,14 @@ export interface IntentoResumen {
     id?: string;
     estado: EstadoIntento;
     calificacion_final: number | null;
+    llamadas_atencion?: number;
+    reintento_permitido?: boolean;
+    motivo_admin?: string | null;
+}
+
+export interface AsignacionExamenInfo {
+    fecha_inicio: string | null;
+    fecha_fin: string | null;
 }
 
 export interface ExamenDisponible {
@@ -57,6 +65,7 @@ export interface ExamenDisponible {
     descripcion: string | null;
     categoria: { nombre: string };
     _count: { preguntas: number };
+    asignacion?: AsignacionExamenInfo;
     intento: IntentoResumen | null;
 }
 
@@ -87,6 +96,45 @@ export interface IncidenteSupervision {
     tipo: IncidenteTipo;
     descripcion?: string;
     creado_en: string;
+    evidencias?: Evidencia[];
+}
+
+export type TipoEvidencia = 'CAPTURA' | 'GRABACION';
+
+export interface Evidencia {
+    id: string;
+    intento_id: string;
+    incidente_id: string | null;
+    tipo: TipoEvidencia;
+    archivo: string;
+    mime: string | null;
+    tamano: number | null;
+    creado_en: string;
+    url?: string;
+    incidente?: Pick<IncidenteSupervision, 'id' | 'tipo' | 'descripcion' | 'creado_en'> | null;
+}
+
+export interface ResultadoIncidente {
+    incidente: IncidenteSupervision;
+    cancelado: boolean;
+    advertencia: boolean;
+    llamadas_atencion: number;
+    strikes?: number;
+    motivo?: string;
+}
+
+export interface IntentoSupervision {
+    id: string;
+    estado: EstadoIntento;
+    calificacion_final: number | null;
+    llamadas_atencion: number;
+    reintento_permitido: boolean;
+    motivo_admin: string | null;
+    iniciado_en: string;
+    entregado_en: string | null;
+    estudiante: { id: string; nombre: string; email: string };
+    examen: { id: string; titulo: string };
+    _count: { incidentes: number; evidencias: number };
 }
 
 export interface ProctoringState {
@@ -110,4 +158,31 @@ export interface UseProctoringOptions {
     onCancelado: (motivo: string) => void;
     version?: number;
     stream?: MediaStream | null;
+}
+
+// ── Grupos y asignaciones ─────────────────────────────────
+
+export interface GrupoResumen {
+    id: string;
+    nombre: string;
+    descripcion: string | null;
+    creado_en: string;
+    _count: { estudiantes: number; asignaciones: number };
+}
+
+export interface GrupoDetalle extends GrupoResumen {
+    estudiantes: { id: string; agregado_en: string; estudiante: { id: string; nombre: string; email: string; activo: boolean } }[];
+    asignaciones: {
+        id: string;
+        fecha_inicio: string | null;
+        fecha_fin: string | null;
+        asignado_en: string;
+        examen: { id: string; titulo: string; descripcion: string | null; publicado: boolean; categoria: { id: string; nombre: string } };
+    }[];
+}
+
+export interface EstudianteDisponible {
+    id: string;
+    nombre: string;
+    email: string;
 }

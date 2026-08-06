@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
 import api from '../../api/axios';
 import type { TipoPregunta, RespuestaEntrega } from '../../types';
-import useProctoring from '../../hooks/useProctoring';
+import useProctoring, { reportarIncidente, cancelarExamen } from '../../hooks/useProctoring';
 import { useTimer } from '../../hooks/useTimer';
 import PermissionGate from '../../components/estudiante/PermissionGate';
 import ProctoringBar from '../../components/estudiante/ProctoringBar';
@@ -229,6 +229,18 @@ const ResponderExamenPage = () => {
         });
     };
 
+    const handlePermisosDenegados = async () => {
+        // SIN_PERMISOS cancela directo en el servidor
+        const res = await reportarIncidente(intento_id!, 'SIN_PERMISOS');
+        setCancelado(res?.motivo || 'Permisos denegados');
+    };
+
+    const handleSalirYCancelar = async (motivo: string) => {
+        await cancelarExamen(intento_id!);
+        if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
+        setCancelado(motivo);
+    };
+
     // ── Supervisión guards ────────────────────────────────
     if (cancelado) return <ExamenCancelado motivo={cancelado} />;
 
@@ -239,7 +251,7 @@ const ResponderExamenPage = () => {
                     setStreamMedia(stream);
                     setMostrarGate(false);
                 }}
-                onDenegado={() => setCancelado('Permisos denegados')}
+                onDenegado={() => handlePermisosDenegados()}
             />
         );
     }
@@ -495,8 +507,10 @@ const ResponderExamenPage = () => {
                     mensaje="Si sales ahora, el examen quedará bloqueado y no podrás volver a realizarlo."
                     textoConfirmar="Sí, salir"
                     textoCancelar="Continuar examen"
-                    onConfirmar={() => {
+                    onConfirmar={async () => {
                         setDialogSalir(false);
+                        await cancelarExamen(intento_id!);
+                        if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
                         navigate('/estudiante/examenes');
                     }}
                     onCancelar={() => setDialogSalir(false)}
@@ -511,12 +525,12 @@ const ResponderExamenPage = () => {
                     textoCancelar="Volver a pantalla completa"
                     onConfirmar={() => {
                         setDialogFullscreen(false);
-                        setCancelado('Saliste del modo de pantalla completa');
+                        handleSalirYCancelar('Saliste del modo de pantalla completa');
                     }}
                     onCancelar={async () => {
                         setDialogFullscreen(false);
                         fullscreenWarningShown.current = false;
-                        try { await document.documentElement.requestFullscreen(); } catch {}
+                        try { await document.documentElement.requestFullscreen(); } catch { /* el navegador puede rechazar fullscreen */ }
                     }}
                 />
             )}
@@ -532,7 +546,7 @@ const ResponderExamenPage = () => {
                     }}
                     onCancelar={() => {
                         setDialogBlur(false);
-                        setCancelado('Cambio de ventana detectado');
+                        handleSalirYCancelar('Cambio de ventana detectado');
                     }}
                 />
             )}

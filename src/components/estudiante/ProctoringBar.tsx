@@ -20,7 +20,7 @@ const barStyle = (level: number) => {
 const ProctoringBar = ({ state }: Props) => {
     const { permisoCamara, permisoMicro, fullscreenActivo, strikesRestantes, error, nivelMovimiento, nivelAudio } = state;
 
-    const strikeDots = [1, 2, 3].map(i => {
+    const strikeDots = [1, 2].map(i => {
         const diff = strikesRestantes - i;
         if (diff >= 1) return 'live';
         if (diff >= 0) return 'warning';
