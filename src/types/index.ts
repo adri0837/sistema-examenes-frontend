@@ -9,6 +9,18 @@ export type TipoPregunta =
 
 export type EstadoIntento = 'EN_PROGRESO' | 'ENTREGADO' | 'CALIFICADO' | 'CANCELADO' | 'REPROBADO';
 
+export interface AnalisisProctoring {
+    movimiento: number;
+    rostro_detectado: boolean;
+    ojos_cerrados: boolean;
+    boca_abierta: boolean;
+    mirando_camara: boolean;
+    cabeza_volteada: boolean;
+    yaw: number;
+    parpadeo: number;
+    mandibula: number;
+}
+
 export interface Usuario {
     id: string;
     nombre: string;

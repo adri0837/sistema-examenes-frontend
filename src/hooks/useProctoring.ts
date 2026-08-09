@@ -1,19 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { ProctoringState, UseProctoringOptions, ResultadoIncidente, TipoEvidencia } from '../types';
+import type { ProctoringState, UseProctoringOptions, ResultadoIncidente, TipoEvidencia, AnalisisProctoring } from '../types';
 import api from '../api/axios';
 
 // Política del backend: 1ª llamada = advertencia, 2ª = cancelación.
 // Las llamadas de atención se cuentan del lado del servidor.
 const LIMITE_LLAMADAS = 2;
-// ponytail: 0.08 detecta movimiento de cabeza, 0.02-0.05 es ruido normal
-const UMBRAL_MOVIMIENTO = 0.08;
+// Umbrales del servicio Python de análisis (proctoring-service/)
+const UMBRAL_MOVIMIENTO = 0.35;
 const INTERVALO_CAPTURA_MS = 2000;
 const CALIBRACION_SEGUNDOS = 5;
+// El servicio de análisis requiere un rostro durante N checks consecutivos
+// antes de reportar (evita falsos positivos por parpadeos/movimientos puntuales)
+const CHECK_SOSTENIDO_SIN_ROSTRO = 3;
+const CHECK_SOSTENIDO_OJOS = 3;
+const CHECK_SOSTENIDO_BOCA = 2;
+const CHECK_SOSTENIDO_VOLTEO = 2;
+// Si el servicio no responde este número de veces seguidas, se muestra un aviso
+const FALLOS_SERVICIO_AVISO = 3;
 // ponytail: 0.08 RMS = conversación normal a 30cm
 const UMBRAL_RUIDO = 0.08;
 // Ventana móvil de audio que se adjunta como evidencia ante un incidente
 const CHUNK_AUDIO_MS = 5000;
 const TAMANO_VENTANA_AUDIO_MS = 15000;
+
+const analizarFrame = async (intentoId: string, frame: string): Promise<AnalisisProctoring | null> => {
+    try {
+        const { data } = await api.post(`/estudiante/intentos/${intentoId}/analizar`, { frame });
+        return data as AnalisisProctoring;
+    } catch {
+        return null;
+    }
+};
 
 export const reportarIncidente = async (intentoId: string, tipo: string, descripcion?: string): Promise<ResultadoIncidente | null> => {
     try {
@@ -86,10 +103,16 @@ const useProctoring = ({
     const mountedRef = useRef(true);
     const streamExternoRef = useRef<MediaStream | null>(null);
     const inicializandoRef = useRef(true); // bloquea blur/visibility durante init
-    // Canvas-based motion detection (sin TF.js)
-    const motionCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const motionCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-    const motionBaselineRef = useRef<ImageData | null>(null);
+    // Canvas para capturar el frame que se envía al servicio Python
+    const frameCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const frameCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+    // Contadores para incidentes sostenidos (evita falsos positivos)
+    const sinRostroContinuoRef = useRef(0);
+    const ojosCerradosContinuoRef = useRef(0);
+    const bocaAbiertaContinuoRef = useRef(0);
+    const volteoContinuoRef = useRef(0);
+    const fallosServicioRef = useRef(0);
+    const analizandoRef = useRef(false);
     // Grabación continua de audio (ventana móvil) como evidencia
     const audioChunksRef = useRef<Blob[]>([]);
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
@@ -229,17 +252,17 @@ const useProctoring = ({
                 }
             }
 
-            // Setup canvas para motion detection (ponytail: sin TF.js, canvas puro, 0 dependencias)
+            // Setup canvas para capturar frames que se envían al servicio de análisis
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (!ctx) {
-                if (mountedRef.current) setState(prev => ({ ...prev, error: 'Detección de movimiento no disponible' }));
+                if (mountedRef.current) setState(prev => ({ ...prev, error: 'El análisis de video no está disponible' }));
                 inicializandoRef.current = false;
                 setState(prev => ({ ...prev, calibrando: false }));
                 return;
             }
-            motionCanvasRef.current = canvas;
-            motionCtxRef.current = ctx;
+            frameCanvasRef.current = canvas;
+            frameCtxRef.current = ctx;
 
             // Esperar que el video tenga frames
             await new Promise<void>(resolve => {
@@ -252,8 +275,10 @@ const useProctoring = ({
             await new Promise(r => setTimeout(r, 200));
             if (!mountedRef.current || canceladoRef.current) return;
 
-            // ── Calibration: canvas frames por 5s, retry hasta pasar ──
-            const W = 80, H = 60; // low-res para performance
+            // ── Calibration: frames por 5s, retry hasta pasar ──
+            // El canvas se redimensiona a la resolución del análisis (320x240):
+            // MediaPipe necesita resolución decente para detectar ojos/boca.
+            const W = 320, H = 240;
 
             const ejecutarCalibracion = async (): Promise<boolean> => {
                 if (!mountedRef.current || canceladoRef.current) return false;
@@ -264,7 +289,6 @@ const useProctoring = ({
 
                 const frames: ImageData[] = [];
                 let ultimaMediaBrillo = 0;
-                let maxVarianza = 0;
 
                 for (let i = 0; i < CALIBRACION_SEGUNDOS; i++) {
                     if (!mountedRef.current || canceladoRef.current) return false;
@@ -275,18 +299,13 @@ const useProctoring = ({
                     const frame = ctx.getImageData(0, 0, W, H);
                     frames.push(frame);
 
-                    // Calcular brillo promedio Y varianza (una cara tiene alto contraste)
+                    // Brillo promedio (cámara no tapada / no apagada)
                     const data = frame.data;
                     let suma = 0;
-                    const vals: number[] = [];
                     for (let j = 0; j < data.length; j += 4) {
-                        const b = (data[j] + data[j+1] + data[j+2]) / 3;
-                        suma += b;
-                        vals.push(b);
+                        suma += (data[j] + data[j+1] + data[j+2]) / 3;
                     }
-                    ultimaMediaBrillo = suma / vals.length;
-                    const varianza = vals.reduce((acc, v) => acc + (v - ultimaMediaBrillo) ** 2, 0) / vals.length;
-                    if (varianza > maxVarianza) maxVarianza = varianza;
+                    ultimaMediaBrillo = suma / (data.length / 4);
 
                     if (mountedRef.current) {
                         setState(prev => ({ ...prev, calibracionProgreso: ((i + 1) / CALIBRACION_SEGUNDOS) * 100 }));
@@ -298,43 +317,53 @@ const useProctoring = ({
                 // Validación 1: brillo mínimo (cámara no tapada)
                 const brilloOk = ultimaMediaBrillo >= 20 && !isNaN(ultimaMediaBrillo);
 
-                // Validación 2: hubo movimiento entre frames (no es una foto fija)
-                let huboMovimiento = false;
-                if (frames.length >= 2) {
-                    for (let f = 1; f < frames.length; f++) {
-                        const prev = frames[f-1].data;
-                        const curr = frames[f].data;
-                        let diff = 0;
-                        for (let j = 0; j < prev.length; j += 4) {
-                            diff += Math.abs(curr[j] - prev[j]) + Math.abs(curr[j+1] - prev[j+1]) + Math.abs(curr[j+2] - prev[j+2]);
-                        }
-                        const diffNorm = diff / (prev.length / 4 * 3 * 255);
-                        // ponytail: 0.03 separa ruido de cámara (~0.015) de movimiento real
-                        if (diffNorm > 0.03) {
-                            huboMovimiento = true;
-                            break;
-                        }
-                    }
+                // Validación 2: el servicio Python debe detectar un rostro real.
+                // Si el servicio no responde (null), degradamos a la heurística
+                // local de varianza para no bloquear al estudiante.
+                let rostroOk = false;
+                let servicioRespondio = false;
+                try {
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    const frameB64 = dataUrl.split(',')[1];
+                    const resultado = await analizarFrame(intentoId, frameB64);
+                    servicioRespondio = resultado !== null;
+                    rostroOk = !!resultado?.rostro_detectado;
+                } catch {
+                    servicioRespondio = false;
                 }
 
-                // Validación 3: varianza mínima (una cara tiene textura, una pared no)
-                // Una cara típica tiene varianza 2000-8000 en 80x60, una pared lisa ~200-800
-                const varianzaOk = maxVarianza > 800 && !isNaN(maxVarianza);
+                // Heurística local de respaldo: varianza mínima (una cara tiene textura)
+                let varianzaOk = true;
+                if (!servicioRespondio) {
+                    let maxVarianza = 0;
+                    for (const f of frames) {
+                        const data = f.data;
+                        let suma = 0;
+                        for (let j = 0; j < data.length; j += 4) {
+                            suma += (data[j] + data[j+1] + data[j+2]) / 3;
+                        }
+                        const media = suma / (data.length / 4);
+                        const varianza = data.reduce(
+                            (acc, _, j) => j % 4 === 3 ? acc : acc + (((data[j] + data[j-1] + data[j+1]) / 3) - media) ** 2,
+                            0
+                        ) / (data.length / 4);
+                        if (varianza > maxVarianza) maxVarianza = varianza;
+                    }
+                    varianzaOk = maxVarianza > 800 && !isNaN(maxVarianza);
+                }
 
-                if (!brilloOk || !huboMovimiento || !varianzaOk) {
+                if (!brilloOk || (servicioRespondio && !rostroOk) || (!servicioRespondio && !varianzaOk)) {
                     if (mountedRef.current) {
                         const motivo = !brilloOk
                             ? 'No se detectó tu rostro. Asegurate de estar frente a la cámara.'
-                            : !varianzaOk
-                                ? 'La cámara solo ve una superficie lisa. Asegurate de estar frente a la cámara.'
-                                : 'No se detectó movimiento. Mové la cabeza suavemente frente a la cámara.';
+                            : servicioRespondio
+                                ? 'No se detectó tu rostro. Asegurate de estar frente a la cámara.'
+                                : 'La cámara solo ve una superficie lisa. Asegurate de estar frente a la cámara.';
                         setState(prev => ({ ...prev, error: motivo }));
                     }
                     return false;
                 }
 
-                // Usar el último frame como baseline
-                motionBaselineRef.current = frames[frames.length - 1];
                 return true;
             };
 
@@ -351,40 +380,80 @@ const useProctoring = ({
             inicializandoRef.current = false;
             setState(prev => ({ ...prev, calibrando: false, calibracionProgreso: 100 }));
 
-            // ── Motion monitoring (canvas frame-diff, sin TF.js) ──
-            if (motionBaselineRef.current) {
-                monitorIntervalRef.current = setInterval(() => {
-                    if (!mountedRef.current || canceladoRef.current || !motionCtxRef.current || !motionCanvasRef.current || !videoRef.current || !motionBaselineRef.current) return;
+            // ── Motion/rostro monitoring (servicio Python vía proxy) ──
+            monitorIntervalRef.current = setInterval(async () => {
+                if (!mountedRef.current || canceladoRef.current || !frameCtxRef.current || !frameCanvasRef.current || !videoRef.current) return;
+                if (analizandoRef.current) return; // no solapar análisis lentos
 
-                    const c = motionCanvasRef.current;
-                    const cx = motionCtxRef.current!;
-                    cx.drawImage(videoRef.current!, 0, 0, c.width, c.height);
-                    const current = cx.getImageData(0, 0, c.width, c.height);
-                    const baseline = motionBaselineRef.current;
+                analizandoRef.current = true;
+                try {
+                    const c = frameCanvasRef.current;
+                    const cx = frameCtxRef.current;
+                    cx.drawImage(videoRef.current, 0, 0, c.width, c.height);
+                    const dataUrl = c.toDataURL('image/jpeg', 0.7);
+                    const frameB64 = dataUrl.split(',')[1];
 
-                    let diffTotal = 0;
-                    const d = current.data;
-                    const b = baseline.data;
-                    const len = Math.min(d.length, b.length);
-                    for (let j = 0; j < len; j += 4) {
-                        diffTotal += Math.abs(d[j] - b[j]) + Math.abs(d[j+1] - b[j+1]) + Math.abs(d[j+2] - b[j+2]);
+                    const resultado = await analizarFrame(intentoId, frameB64);
+
+                    if (!mountedRef.current || canceladoRef.current) return;
+
+                    if (!resultado) {
+                        // Servicio no disponible: avisar si lleva varios fallos seguidos
+                        fallosServicioRef.current += 1;
+                        if (fallosServicioRef.current >= FALLOS_SERVICIO_AVISO) {
+                            setState(prev => prev.error ? prev : { ...prev, error: 'El servicio de análisis de cámara no responde. La supervisión visual está degradada.' });
+                        }
+                        return;
                     }
-                    const diffNorm = diffTotal / (len / 4 * 3 * 255);
+                    fallosServicioRef.current = 0;
 
-                    // Mostrar nivel en vivo
-                    setState(prev => ({ ...prev, nivelMovimiento: Math.round(diffNorm * 1000) / 1000 }));
+                    // Nivel en vivo
+                    setState(prev => ({ ...prev, nivelMovimiento: Math.round(resultado.movimiento * 1000) / 1000 }));
 
-                    // El servidor decide: 1ª llamada = advertencia, 2ª = cancelación
-                    if (diffNorm > UMBRAL_MOVIMIENTO) {
-                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', `Dif: ${diffNorm.toFixed(3)}`);
+                    // ── Movimiento excesivo ──
+                    if (resultado.movimiento > UMBRAL_MOVIMIENTO) {
+                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', `Dif: ${resultado.movimiento.toFixed(3)}`);
                     }
 
-                    // Actualizar baseline al frame actual para que la próxima comparación
-                    // sea contra el frame anterior, no contra una foto congelada de calibración.
-                    // Sin esto, moverse UNA vez suma strikes infinitos aunque el alumno esté quieto.
-                    motionBaselineRef.current = current;
-                }, INTERVALO_CAPTURA_MS);
-            }
+                    // ── Sin rostro sostenido → SIN_CAMARA ──
+                    sinRostroContinuoRef.current = resultado.rostro_detectado
+                        ? 0
+                        : sinRostroContinuoRef.current + 1;
+                    if (sinRostroContinuoRef.current >= CHECK_SOSTENIDO_SIN_ROSTRO) {
+                        sinRostroContinuoRef.current = 0;
+                        void reportarYProcesarRef.current?.('SIN_CAMARA', 'No se detectó tu rostro');
+                    }
+
+                    // ── Ojos cerrados sostenidos → MOVIMIENTO_SOSPECHOSO ──
+                    ojosCerradosContinuoRef.current = !resultado.ojos_cerrados
+                        ? 0
+                        : ojosCerradosContinuoRef.current + 1;
+                    if (ojosCerradosContinuoRef.current >= CHECK_SOSTENIDO_OJOS) {
+                        ojosCerradosContinuoRef.current = 0;
+                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', 'Ojos cerrados detectados');
+                    }
+
+                    // ── Boca abierta sostenida → RUIDO (posible conversación) ──
+                    bocaAbiertaContinuoRef.current = !resultado.boca_abierta
+                        ? 0
+                        : bocaAbiertaContinuoRef.current + 1;
+                    if (bocaAbiertaContinuoRef.current >= CHECK_SOSTENIDO_BOCA) {
+                        bocaAbiertaContinuoRef.current = 0;
+                        void reportarYProcesarRef.current?.('RUIDO_SOSPECHOSO', 'Boca abierta (posible conversación)');
+                    }
+
+                    // ── Cabeza volteada sostenida → MOVIMIENTO_SOSPECHOSO ──
+                    volteoContinuoRef.current = !resultado.cabeza_volteada
+                        ? 0
+                        : volteoContinuoRef.current + 1;
+                    if (volteoContinuoRef.current >= CHECK_SOSTENIDO_VOLTEO) {
+                        volteoContinuoRef.current = 0;
+                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', 'Cabeza volteada detectada');
+                    }
+                } finally {
+                    analizandoRef.current = false;
+                }
+            }, INTERVALO_CAPTURA_MS);
 
             // Audio monitoring (RMS) — siempre activo
             audioIntervalRef.current = setInterval(() => {
@@ -440,9 +509,14 @@ const useProctoring = ({
                 document.exitFullscreen().catch(() => {});
             }
             // Cleanup canvas
-            motionCanvasRef.current = null;
-            motionCtxRef.current = null;
-            motionBaselineRef.current = null;
+            frameCanvasRef.current = null;
+            frameCtxRef.current = null;
+            sinRostroContinuoRef.current = 0;
+            ojosCerradosContinuoRef.current = 0;
+            bocaAbiertaContinuoRef.current = 0;
+            volteoContinuoRef.current = 0;
+            fallosServicioRef.current = 0;
+            analizandoRef.current = false;
         };
     // handleCancelacion, actualizarStrikes y reportarYProcesar NO van en deps — se acceden
     // via ref para evitar que el effect se reinicie en cada render del padre (lo que mata el stream).
