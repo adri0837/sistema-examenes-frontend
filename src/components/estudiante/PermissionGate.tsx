@@ -10,6 +10,7 @@ const PermissionGate = ({ onPermisosConcedidos, onDenegado }: Props) => {
     const [camaraState, setCamaraState] = useState<'pending' | 'granted' | 'denied'>('pending');
     const [microState, setMicroState] = useState<'pending' | 'granted' | 'denied'>('pending');
     const [intentando, setIntentando] = useState(false);
+    const [permisoBloqueadoPersistente, setPermisoBloqueadoPersistente] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const pasadoAlPadreRef = useRef(false);
@@ -19,6 +20,7 @@ const PermissionGate = ({ onPermisosConcedidos, onDenegado }: Props) => {
         setIntentando(true);
         setCamaraState('pending');
         setMicroState('pending');
+        setPermisoBloqueadoPersistente(false);
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -41,10 +43,18 @@ const PermissionGate = ({ onPermisosConcedidos, onDenegado }: Props) => {
             }
             // No auto-advance — el usuario siempre confirma manualmente
             // para que vea el diálogo de permisos del navegador
-        } catch {
+        } catch (err) {
             if (pasadoAlPadreRef.current) return;
             setCamaraState('denied');
             setMicroState('denied');
+            // El navegador guardó la negación: no volverá a preguntar con getUserMedia.
+            // Solo se puede desbloquear desde la configuración del sitio (candado en la URL).
+            const name = (err as DOMException)?.name || '';
+            setPermisoBloqueadoPersistente(
+                name === 'NotAllowedError' ||
+                name === 'PermissionDeniedError' ||
+                name === 'SecurityError'
+            );
         } finally {
             setIntentando(false);
         }
@@ -104,8 +114,9 @@ const PermissionGate = ({ onPermisosConcedidos, onDenegado }: Props) => {
                 {denied && (
                     <>
                         <p style={{ color: '#dc2626', fontSize: '0.88rem', background: '#fef2f2', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                            No podemos continuar sin los permisos de cámara y micrófono.
-                            Revisa la configuración de tu navegador y permite el acceso.
+                            {permisoBloqueadoPersistente
+                                ? 'El navegador guardó la negación y no volverá a preguntar automáticamente. Hacé clic en el candado 🔒 junto a la barra de direcciones → Permisos del sitio → permití Cámara y Micrófono, y volvé a intentar.'
+                                : 'No podemos continuar sin los permisos de cámara y micrófono. Revisa la configuración de tu navegador y permite el acceso.'}
                         </p>
                         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                             <button

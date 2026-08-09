@@ -25,8 +25,15 @@ const barStyleAudio = (db: number) => {
     return { width: `${pct}%`, background: `hsl(${hue}, 70%, 45%)` };
 };
 
+// Barra para yaw/pitch: mapea [0, 1.5] → 4%-100% (valores normalizados por ancho de ojos)
+const barStylePose = (v: number) => {
+    const pct = Math.max(4, Math.min(100, (Math.abs(v) / 1.5) * 100));
+    const hue = Math.abs(v) >= 0.4 ? 0 : Math.abs(v) >= 0.2 ? 40 : 120;
+    return { width: `${pct}%`, background: `hsl(${hue}, 70%, 45%)` };
+};
+
 const ProctoringBar = ({ state }: Props) => {
-    const { permisoCamara, permisoMicro, fullscreenActivo, strikesRestantes, error, advertencia, nivelMovimiento, nivelAudio } = state;
+    const { permisoCamara, permisoMicro, fullscreenActivo, strikesRestantes, error, advertencia, nivelMovimiento, nivelAudio, nivelYaw, nivelPitch } = state;
 
     const strikeDots = [1, 2].map(i => {
         const diff = strikesRestantes - i;
@@ -62,6 +69,14 @@ const ProctoringBar = ({ state }: Props) => {
                 <span className="proctoring-live-item" title={`Audio: ${nivelAudio.toFixed(1)} dBFS`}>
                     <span className="proctoring-live-bar" style={barStyleAudio(nivelAudio)} />
                     <span className={`proctoring-live-dot ${nivelAudio > ALERT_AUDIO ? 'alert' : nivelAudio > WARN_AUDIO ? 'warn' : 'ok'}`} />
+                </span>
+                <span className="proctoring-live-item" title={`Cabeza lateral (yaw): ${nivelYaw.toFixed(2)}`}>
+                    <span className="proctoring-live-bar" style={barStylePose(nivelYaw)} />
+                    <span className={`proctoring-live-dot ${Math.abs(nivelYaw) >= 0.4 ? 'alert' : Math.abs(nivelYaw) >= 0.2 ? 'warn' : 'ok'}`} />
+                </span>
+                <span className="proctoring-live-item" title={`Cabeza abajo/arriba (pitch): ${nivelPitch.toFixed(2)}`}>
+                    <span className="proctoring-live-bar" style={barStylePose(nivelPitch)} />
+                    <span className={`proctoring-live-dot ${Math.abs(nivelPitch) >= 0.9 ? 'alert' : Math.abs(nivelPitch) >= 0.5 ? 'warn' : 'ok'}`} />
                 </span>
             </div>
 

@@ -18,17 +18,34 @@ const CALIBRACION_SEGUNDOS = 5;
 const CHECK_SOSTENIDO_SIN_ROSTRO = 3;
 const CHECK_SOSTENIDO_OJOS = 3;
 const CHECK_SOSTENIDO_BOCA = 2;
-const CHECK_SOSTENIDO_VOLTEO = 2;
+const CHECK_SOSTENIDO_VOLTEO = 3;
 // Si el servicio no responde este número de veces seguidas, se muestra un aviso
 const FALLOS_SERVICIO_AVISO = 3;
+// Checks consecutivos de comportamiento normal para limpiar la advertencia:
+// el alumno debe volver a la normalidad de forma SOSTENIDA (~8s a 2s/check)
+// antes de que desaparezca la alerta roja de la 1ª llamada.
+const CHECK_RESET_ADVERTENCIA = 4;
+// Cooldown entre reportes de incidentes: evita que una ráfaga de falsos
+// positivos (vibración del sensor, parpadeo de luz, tos) acumule dos llamadas
+// en segundos y cancele el examen. La política sigue siendo 2 llamadas, pero
+// con margen de tiempo para reestablecerse.
+const COOLDOWN_REPORTE_MS = 10000;
 // Ruido de audio medido en dBFS (decibeles relativos a escala completa).
 // El navegador no puede medir dB SPL absolutos sin calibración, pero dBFS es
 // suficiente para detectar ruido RELATIVO al ambiente de cada máquina.
 // Durante la calibración se mide el piso de ruido de la sala y se dispara cuando
-// el nivel sostenido lo supera por MARGEN_RUIDO_DB (un susurro está ~10-15 dB
-// por encima del ambiente). Umbral de respaldo si la calibración no obtuvo muestras.
-const MARGEN_RUIDO_DB = 12;
-const UMBRAL_RUIDO_DBFS_FALLBACK = -35;
+// el nivel sostenido lo supera por MARGEN_RUIDO_DB. Un susurro suele estar
+// 4-8 dB por encima del ambiente, por eso el margen es bajo.
+const MARGEN_RUIDO_DB = 8;
+const UMBRAL_RUIDO_DBFS_FALLBACK = -38;
+// Checks consecutivos que confirman un pico antes de reportar (integrador).
+// 3 de 6 ≈ ~0.75s de ruido sostenido — tolera ruidos puntuales y atrapa
+// susurros/habla sostenidos.
+const RUIDO_ACTIVADO = 3;
+const RUIDO_MAX = 6;
+// Ganancia extra sobre el micrófono antes del análisis: muchos micrófonos
+// salen muy bajos y apenas mueven el medidor. ~9.5 dB (gain 3x).
+const GANANCIA_MICRO = 3;
 // Ventana móvil de audio que se adjunta como evidencia ante un incidente
 const CHUNK_AUDIO_MS = 5000;
 const TAMANO_VENTANA_AUDIO_MS = 15000;
@@ -109,6 +126,8 @@ const useProctoring = ({
         advertencia: null,
         nivelMovimiento: 0,
         nivelAudio: -60, // dBFS (silencio de referencia)
+        nivelYaw: 0,
+        nivelPitch: 0,
     });
 
     // ── Refs ───────────────────────────────────────────────
@@ -134,8 +153,16 @@ const useProctoring = ({
     const ojosCerradosContinuoRef = useRef(0);
     const bocaAbiertaContinuoRef = useRef(0);
     const volteoContinuoRef = useRef(0);
+    const mirandoFueraContinuoRef = useRef(0);
     const fallosServicioRef = useRef(0);
     const analizandoRef = useRef(false);
+    // Checks consecutivos de comportamiento normal → limpia la advertencia roja
+    const normalContinuoRef = useRef(0);
+    // Último reporte de incidente (ms) para el cooldown anti-ráfaga
+    const ultimoReporteRef = useRef(0);
+    // Checks consecutivos de movimiento excesivo (sin él, una vibración de la
+    // cámara dispara por frame y suma llamadas en segundos)
+    const movimientoContinuoRef = useRef(0);
     // Grabación continua de audio (ventana móvil) como evidencia
     const audioChunksRef = useRef<Blob[]>([]);
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
@@ -185,6 +212,13 @@ const useProctoring = ({
 
     // Reporta el incidente al servidor, actualiza las llamadas y decide si cancela
     const reportarYProcesar = useCallback(async (tipo: string, descripcion?: string) => {
+        // Cooldown anti-ráfaga: si ya se reportó hace menos de X ms, ignora.
+        // Un solo incidente real cuenta UNA llamada; una ráfaga de falsos
+        // positivos no debe acumular dos llamadas y cancelar el examen.
+        const ahora = Date.now();
+        if (ahora - ultimoReporteRef.current < COOLDOWN_REPORTE_MS) return;
+        ultimoReporteRef.current = ahora;
+
         const resultado = await reportarIncidente(intentoId, tipo, descripcion);
         if (!resultado) return;
         if (typeof resultado.llamadas_atencion === 'number') {
@@ -242,7 +276,12 @@ const useProctoring = ({
                 const src = audioCtx.createMediaStreamSource(stream);
                 const analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
-                src.connect(analyser);
+                // Amplificar el micrófono para que micrófonos silenciosos registren
+                // niveles útiles (el AGC está desactivado por la calibración del piso).
+                const gain = audioCtx.createGain();
+                gain.gain.value = GANANCIA_MICRO;
+                src.connect(gain);
+                gain.connect(analyser);
                 audioContextRef.current = audioCtx;
                 analyserRef.current = analyser;
             } catch {
@@ -399,11 +438,14 @@ const useProctoring = ({
                     return false;
                 }
 
-                // Calibrar el piso de ruido: tomar la muestra más baja como ambiente
-                // (más robusto que el promedio ante un ruido aislado durante el setup).
+                // Calibrar el piso de ruido: percentil bajo de las muestras.
+                // El mínimo absoluto es frágil (un silencio puntual lo deja muy
+                // bajo y hace el sistema hiper-sensible). El percentil 25 es un
+                // piso representativo del ambiente y sigue detectando susurros.
                 const muestras = muestrasDbfsRef.current.filter(v => isFinite(v));
                 if (muestras.length > 0) {
-                    const piso = Math.min(...muestras);
+                    const ordenadas = [...muestras].sort((a, b) => a - b);
+                    const piso = ordenadas[Math.floor(ordenadas.length * 0.25)];
                     // Evitar un umbral absurdo: la sala rara vez baja de -60 dBFS.
                     pisoRuidoDbfsRef.current = Math.max(piso, -60);
                 }
@@ -452,11 +494,35 @@ const useProctoring = ({
                     fallosServicioRef.current = 0;
 
                     // Nivel en vivo
-                    setState(prev => ({ ...prev, nivelMovimiento: Math.round(resultado.movimiento * 1000) / 1000 }));
+                    setState(prev => ({
+                        ...prev,
+                        nivelMovimiento: Math.round(resultado.movimiento * 1000) / 1000,
+                        nivelYaw: resultado.yaw ?? 0,
+                        nivelPitch: resultado.pitch ?? 0,
+                    }));
 
                     // ── Movimiento excesivo ──
-                    if (resultado.movimiento > UMBRAL_MOVIMIENTO) {
+                    // Requiere N checks consecutivos por encima del umbral: una
+                    // vibración del sensor o un parpadeo de luz puede dar un pico
+                    // aislado, pero moverse de verdad se sostiene en el tiempo.
+                    movimientoContinuoRef.current = resultado.movimiento > UMBRAL_MOVIMIENTO
+                        ? movimientoContinuoRef.current + 1
+                        : 0;
+                    if (movimientoContinuoRef.current >= CHECK_SOSTENIDO_VOLTEO) {
+                        movimientoContinuoRef.current = 0;
                         void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', `Dif: ${resultado.movimiento.toFixed(3)}`);
+                    }
+
+                    // ── Mirando fuera de la cámara (giro/pitch moderado) ──
+                    // Detecta la mirada lateral/abajo (celular, otra pantalla) que
+                    // aún no llega a volteo completo. Dividimos rangos para no
+                    // reportar dos veces el mismo incidente.
+                    mirandoFueraContinuoRef.current = (!resultado.mirando_camara && !resultado.cabeza_volteada)
+                        ? mirandoFueraContinuoRef.current + 1
+                        : 0;
+                    if (mirandoFueraContinuoRef.current >= CHECK_SOSTENIDO_VOLTEO) {
+                        mirandoFueraContinuoRef.current = 0;
+                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', `Mirada fuera de cámara (yaw ${resultado.yaw?.toFixed(2)}, pitch ${resultado.pitch?.toFixed(2)})`);
                     }
 
                     // ── Sin rostro sostenido → SIN_CAMARA ──
@@ -494,6 +560,22 @@ const useProctoring = ({
                         volteoContinuoRef.current = 0;
                         void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', 'Cabeza volteada detectada');
                     }
+
+                    // ── Reset de la advertencia ──
+                    // Si el alumno vuelve a comportamiento normal de forma
+                    // sostenida, limpia la alerta roja de la 1ª llamada para que
+                    // no quede pegada y se pueda restablecer.
+                    const todoNormal = resultado.movimiento <= UMBRAL_MOVIMIENTO &&
+                        resultado.mirando_camara &&
+                        !resultado.cabeza_volteada &&
+                        resultado.rostro_detectado &&
+                        !resultado.ojos_cerrados &&
+                        !resultado.boca_abierta;
+                    normalContinuoRef.current = todoNormal ? normalContinuoRef.current + 1 : 0;
+                    if (normalContinuoRef.current >= CHECK_RESET_ADVERTENCIA) {
+                        normalContinuoRef.current = 0;
+                        setState(prev => (prev.advertencia ? { ...prev, advertencia: null } : prev));
+                    }
                 } finally {
                     analizandoRef.current = false;
                 }
@@ -515,15 +597,24 @@ const useProctoring = ({
                 // Integrador: sube con ruido sostenido, baja con silencio
                 // Tolerante a micro-pausas del habla, evita falsos con picos aislados
                 if (dbfs > umbral) {
-                    ruidoContinuoRef.current = Math.min(6, ruidoContinuoRef.current + 1);
+                    ruidoContinuoRef.current = Math.min(RUIDO_MAX, ruidoContinuoRef.current + 1);
                 } else {
                     ruidoContinuoRef.current = Math.max(0, ruidoContinuoRef.current - 1);
                 }
 
-                // 4 de 6 checks (~1.5s de ruido en una ventana de 3s) → incidente
-                if (ruidoContinuoRef.current >= 4) {
+                // 2 de 6 checks (~0.5s de ruido en una ventana de 3s) → incidente.
+                // Sensible a susurros cortos; el piso por percentil evita que se
+                // vuelva hipersensible.
+                if (ruidoContinuoRef.current >= RUIDO_ACTIVADO) {
                     ruidoContinuoRef.current = 0;
                     void reportarYProcesarRef.current?.('RUIDO_SOSPECHOSO', `Nivel: ${dbfs.toFixed(1)} dBFS (umbral ${umbral.toFixed(1)})`);
+                }
+
+                // Re-calibrar el piso hacia abajo si el ambiente se vuelve más
+                // silencioso de forma sostenida (p. ej. un video que sonaba durante
+                // la calibración y se pausa después). Solo baja, nunca sube.
+                if (pisoRuidoDbfsRef.current !== null && dbfs < pisoRuidoDbfsRef.current - 6) {
+                    pisoRuidoDbfsRef.current = Math.max(dbfs, -60);
                 }
             }, 500);
         })();
@@ -557,6 +648,7 @@ const useProctoring = ({
             ojosCerradosContinuoRef.current = 0;
             bocaAbiertaContinuoRef.current = 0;
             volteoContinuoRef.current = 0;
+            mirandoFueraContinuoRef.current = 0;
             fallosServicioRef.current = 0;
             analizandoRef.current = false;
             ruidoContinuoRef.current = 0;

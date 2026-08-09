@@ -17,6 +17,7 @@ export interface AnalisisProctoring {
     mirando_camara: boolean;
     cabeza_volteada: boolean;
     yaw: number;
+    pitch: number;
     parpadeo: number;
     mandibula: number;
 }
@@ -164,6 +165,10 @@ export interface ProctoringState {
     nivelMovimiento: number;
     /** Nivel de audio en dBFS (negativo, live). -60 ≈ silencio, 0 ≈ escala completa */
     nivelAudio: number;
+    /** Giro lateral de la cabeza (yaw), normalizado por ancho de ojos (live) */
+    nivelYaw: number;
+    /** Inclinación vertical de la cabeza (pitch), normalizado (live) */
+    nivelPitch: number;
 }
 
 export interface UseProctoringOptions {
