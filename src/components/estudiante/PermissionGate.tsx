@@ -23,7 +23,13 @@ const PermissionGate = ({ onPermisosConcedidos, onDenegado }: Props) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
-                audio: true,
+                // Desactivar AGC/noise-suppression: el AGC normaliza el volumen y
+                // destruiría la calibración del piso de ruido (imposible detectar susurros).
+                audio: {
+                    autoGainControl: false,
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                },
             });
             if (pasadoAlPadreRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
             streamRef.current = stream;

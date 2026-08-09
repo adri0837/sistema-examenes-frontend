@@ -160,7 +160,7 @@ export interface ProctoringState {
     error: string | null;
     /** 0.0-1.0 normalized pixel diff from baseline (live) */
     nivelMovimiento: number;
-    /** 0.0-1.0 normalized audio RMS level (live) */
+    /** Nivel de audio en dBFS (negativo, live). -60 ≈ silencio, 0 ≈ escala completa */
     nivelAudio: number;
 }
 

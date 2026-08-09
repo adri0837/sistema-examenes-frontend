@@ -17,11 +17,27 @@ const CHECK_SOSTENIDO_BOCA = 2;
 const CHECK_SOSTENIDO_VOLTEO = 2;
 // Si el servicio no responde este número de veces seguidas, se muestra un aviso
 const FALLOS_SERVICIO_AVISO = 3;
-// ponytail: 0.08 RMS = conversación normal a 30cm
-const UMBRAL_RUIDO = 0.08;
+// Ruido de audio medido en dBFS (decibeles relativos a escala completa).
+// El navegador no puede medir dB SPL absolutos sin calibración, pero dBFS es
+// suficiente para detectar ruido RELATIVO al ambiente de cada máquina.
+// Durante la calibración se mide el piso de ruido de la sala y se dispara cuando
+// el nivel sostenido lo supera por MARGEN_RUIDO_DB (un susurro está ~10-15 dB
+// por encima del ambiente). Umbral de respaldo si la calibración no obtuvo muestras.
+const MARGEN_RUIDO_DB = 12;
+const UMBRAL_RUIDO_DBFS_FALLBACK = -35;
 // Ventana móvil de audio que se adjunta como evidencia ante un incidente
 const CHUNK_AUDIO_MS = 5000;
 const TAMANO_VENTANA_AUDIO_MS = 15000;
+
+// Nivel de audio en dBFS usando Float32 (más preciso que bytes para sonidos bajos)
+const medirDbfs = (analyser: AnalyserNode): number => {
+    const data = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    return 20 * Math.log10(Math.max(rms, 1e-6));
+};
 
 const analizarFrame = async (intentoId: string, frame: string): Promise<AnalisisProctoring | null> => {
     try {
@@ -87,7 +103,7 @@ const useProctoring = ({
         blurAdvertencias: 0,
         error: null,
         nivelMovimiento: 0,
-        nivelAudio: 0,
+        nivelAudio: -60, // dBFS (silencio de referencia)
     });
 
     // ── Refs ───────────────────────────────────────────────
@@ -98,6 +114,8 @@ const useProctoring = ({
     const strikesRef = useRef(0); // llamadas de atención según el servidor
     const canceladoRef = useRef(false);
     const ruidoContinuoRef = useRef(0);
+    const pisoRuidoDbfsRef = useRef<number | null>(null); // piso de ruido calibrado (dBFS)
+    const muestrasDbfsRef = useRef<number[]>([]); // muestras de dBFS tomadas durante la calibración
     const monitorIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const audioIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const mountedRef = useRef(true);
@@ -283,6 +301,7 @@ const useProctoring = ({
             const ejecutarCalibracion = async (): Promise<boolean> => {
                 if (!mountedRef.current || canceladoRef.current) return false;
                 setState(prev => ({ ...prev, calibracionProgreso: 0, error: null }));
+                muestrasDbfsRef.current = [];
 
                 canvas.width = W;
                 canvas.height = H;
@@ -294,6 +313,13 @@ const useProctoring = ({
                     if (!mountedRef.current || canceladoRef.current) return false;
                     await new Promise(r => setTimeout(r, 1000));
                     if (!mountedRef.current || canceladoRef.current) return false;
+
+                    // Muestrear nivel de audio (dBFS) para calibrar el piso de ruido.
+                    // El susurro vive ~10-15 dB por encima del ambiente, así que el
+                    // umbral se deriva del ambiente real de esta máquina.
+                    if (analyserRef.current) {
+                        muestrasDbfsRef.current.push(medirDbfs(analyserRef.current));
+                    }
 
                     ctx.drawImage(video, 0, 0, W, H);
                     const frame = ctx.getImageData(0, 0, W, H);
@@ -362,6 +388,15 @@ const useProctoring = ({
                         setState(prev => ({ ...prev, error: motivo }));
                     }
                     return false;
+                }
+
+                // Calibrar el piso de ruido: tomar la muestra más baja como ambiente
+                // (más robusto que el promedio ante un ruido aislado durante el setup).
+                const muestras = muestrasDbfsRef.current.filter(v => isFinite(v));
+                if (muestras.length > 0) {
+                    const piso = Math.min(...muestras);
+                    // Evitar un umbral absurdo: la sala rara vez baja de -60 dBFS.
+                    pisoRuidoDbfsRef.current = Math.max(piso, -60);
                 }
 
                 return true;
@@ -455,24 +490,22 @@ const useProctoring = ({
                 }
             }, INTERVALO_CAPTURA_MS);
 
-            // Audio monitoring (RMS) — siempre activo
+            // Audio monitoring (dBFS) — siempre activo
             audioIntervalRef.current = setInterval(() => {
                 if (!mountedRef.current || canceladoRef.current || !analyserRef.current) return;
-                const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-                analyserRef.current.getByteTimeDomainData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    const val = (dataArray[i] - 128) / 128;
-                    sum += val * val;
-                }
-                const rms = Math.sqrt(sum / dataArray.length);
+                const dbfs = medirDbfs(analyserRef.current);
 
                 // Mostrar nivel en vivo
-                setState(prev => ({ ...prev, nivelAudio: Math.round(rms * 1000) / 1000 }));
+                setState(prev => ({ ...prev, nivelAudio: Math.round(dbfs * 100) / 100 }));
+
+                // Umbral: piso de ruido calibrado + margen, o respaldo si no se calibró
+                const umbral = pisoRuidoDbfsRef.current !== null
+                    ? pisoRuidoDbfsRef.current + MARGEN_RUIDO_DB
+                    : UMBRAL_RUIDO_DBFS_FALLBACK;
 
                 // Integrador: sube con ruido sostenido, baja con silencio
                 // Tolerante a micro-pausas del habla, evita falsos con picos aislados
-                if (rms > UMBRAL_RUIDO) {
+                if (dbfs > umbral) {
                     ruidoContinuoRef.current = Math.min(6, ruidoContinuoRef.current + 1);
                 } else {
                     ruidoContinuoRef.current = Math.max(0, ruidoContinuoRef.current - 1);
@@ -481,7 +514,7 @@ const useProctoring = ({
                 // 4 de 6 checks (~1.5s de ruido en una ventana de 3s) → incidente
                 if (ruidoContinuoRef.current >= 4) {
                     ruidoContinuoRef.current = 0;
-                    void reportarYProcesarRef.current?.('RUIDO_SOSPECHOSO', `RMS: ${rms.toFixed(3)}`);
+                    void reportarYProcesarRef.current?.('RUIDO_SOSPECHOSO', `Nivel: ${dbfs.toFixed(1)} dBFS (umbral ${umbral.toFixed(1)})`);
                 }
             }, 500);
         })();
@@ -517,6 +550,9 @@ const useProctoring = ({
             volteoContinuoRef.current = 0;
             fallosServicioRef.current = 0;
             analizandoRef.current = false;
+            ruidoContinuoRef.current = 0;
+            pisoRuidoDbfsRef.current = null;
+            muestrasDbfsRef.current = [];
         };
     // handleCancelacion, actualizarStrikes y reportarYProcesar NO van en deps — se acceden
     // via ref para evitar que el effect se reinicie en cada render del padre (lo que mata el stream).

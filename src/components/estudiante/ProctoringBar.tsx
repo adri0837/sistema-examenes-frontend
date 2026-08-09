@@ -8,13 +8,21 @@ interface Props {
 // Umbrales visuales para la barra (más sensibles que los de strike)
 const WARN_MOV = 0.04;
 const ALERT_MOV = 0.08;
-const WARN_AUDIO = 0.04;
-const ALERT_AUDIO = 0.08;
+// dBFS: -60 ≈ silencio, -35 ≈ susurro, 0 ≈ escala completa
+const WARN_AUDIO = -40;
+const ALERT_AUDIO = -32;
 
 const barStyle = (level: number) => {
     const pct = Math.min(100, level * 500); // escala: 0.20 = 100%
     const hue = level >= ALERT_MOV ? 0 : 120;
     return { width: `${Math.max(4, pct)}%`, background: `hsl(${hue}, 70%, 45%)` };
+};
+
+// Barra para dBFS: mapea [-60, 0] → 4%-100%
+const barStyleAudio = (db: number) => {
+    const pct = Math.max(4, Math.min(100, ((db + 60) / 60) * 100));
+    const hue = db >= ALERT_AUDIO ? 0 : 120;
+    return { width: `${pct}%`, background: `hsl(${hue}, 70%, 45%)` };
 };
 
 const ProctoringBar = ({ state }: Props) => {
@@ -51,8 +59,8 @@ const ProctoringBar = ({ state }: Props) => {
                     <span className="proctoring-live-bar" style={barStyle(nivelMovimiento)} />
                     <span className={`proctoring-live-dot ${nivelMovimiento > ALERT_MOV ? 'alert' : nivelMovimiento > WARN_MOV ? 'warn' : 'ok'}`} />
                 </span>
-                <span className="proctoring-live-item" title={`Audio: ${nivelAudio.toFixed(3)}`}>
-                    <span className="proctoring-live-bar" style={barStyle(nivelAudio)} />
+                <span className="proctoring-live-item" title={`Audio: ${nivelAudio.toFixed(1)} dBFS`}>
+                    <span className="proctoring-live-bar" style={barStyleAudio(nivelAudio)} />
                     <span className={`proctoring-live-dot ${nivelAudio > ALERT_AUDIO ? 'alert' : nivelAudio > WARN_AUDIO ? 'warn' : 'ok'}`} />
                 </span>
             </div>
