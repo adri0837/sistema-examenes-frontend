@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ProctoringState, UseProctoringOptions, ResultadoIncidente, TipoEvidencia, AnalisisProctoring } from '../types';
 import api from '../api/axios';
 
+// Base de la API — espejo de api/axios.ts (necesaria para fetch keepalive,
+// que no pasa por el interceptor de axios en beforeunload).
+const BASE_URL_API = 'http://localhost:3000/api';
+
 // Política del backend: 1ª llamada = advertencia, 2ª = cancelación.
 // Las llamadas de atención se cuentan del lado del servidor.
 const LIMITE_LLAMADAS = 2;
@@ -102,6 +106,7 @@ const useProctoring = ({
         calibracionProgreso: 0,
         blurAdvertencias: 0,
         error: null,
+        advertencia: null,
         nivelMovimiento: 0,
         nivelAudio: -60, // dBFS (silencio de referencia)
     });
@@ -190,6 +195,10 @@ const useProctoring = ({
             void subirEvidenciasIncidente(resultado.incidente?.id);
             handleCancelacionRef.current?.(resultado.motivo || 'El examen fue cancelado', true);
         } else {
+            // 1ª llamada de atención: advertencia visible (el servidor NO canceló)
+            if (resultado.advertencia && resultado.motivo && !canceladoRef.current) {
+                setState(prev => ({ ...prev, advertencia: resultado.motivo || 'Primera llamada de atención. Si se repite, el examen se cancelará y será reprobado' }));
+            }
             void subirEvidenciasIncidente(resultado.incidente?.id);
         }
     }, [intentoId, subirEvidenciasIncidente]);
@@ -580,12 +589,19 @@ const useProctoring = ({
         };
 
         const onBeforeUnload = () => {
-            if (!canceladoRef.current) {
-                navigator.sendBeacon(
-                    `http://localhost:3000/api/estudiante/intentos/${intentoId}/incidentes`,
-                    JSON.stringify({ tipo: 'CIERRE_NAVEGADOR', descripcion: 'Navegador cerrado durante examen' })
-                );
-            }
+            if (canceladoRef.current) return;
+            // fetch keepalive permite headers (Authorization + Content-Type JSON),
+            // que sendBeacon no soporta. El backend exige Bearer y JSON.parse.
+            const token = localStorage.getItem('token');
+            void fetch(`${BASE_URL_API}/estudiante/intentos/${intentoId}/incidentes`, {
+                method: 'POST',
+                keepalive: true,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ tipo: 'CIERRE_NAVEGADOR', descripcion: 'Navegador cerrado durante examen' }),
+            });
         };
 
         document.addEventListener('visibilitychange', onVisibilityChange);

@@ -47,6 +47,12 @@ const ResponderExamenPage = () => {
     const entregandoRef = useRef(false);
     const avanzandoRef = useRef(false);
 
+    // ── Persistencia de respuestas (F5/recarga no pierde el avance) ──
+    const storageKeyRespuestas = `respuestas_${intento_id}`;
+    const guardarRespuestas = useCallback((r: Record<string, Partial<RespuestaEntrega>>) => {
+        try { localStorage.setItem(storageKeyRespuestas, JSON.stringify(r)); } catch { /* almacenamiento lleno/privado */ }
+    }, [storageKeyRespuestas]);
+
     // ── Supervisión ───────────────────────────────────────
     const [supervisionActiva, setSupervisionActiva] = useState(false);
     const [cancelado, setCancelado] = useState<string | null>(null);
@@ -80,6 +86,11 @@ const ResponderExamenPage = () => {
                 const { data } = await api.get(`/estudiante/intentos/${intento_id}`);
                 setExamen(data.examen);
                 setPreguntas(data.preguntas);
+                // Restaurar respuestas guardadas (F5/recarga)
+                try {
+                    const guardadas = localStorage.getItem(`respuestas_${intento_id}`);
+                    if (guardadas) setRespuestas(JSON.parse(guardadas));
+                } catch { /* storage corrupto → empezar de cero */ }
                 if (data.examen?.supervision_activa) {
                     setSupervisionActiva(true);
                 }
@@ -95,6 +106,12 @@ const ResponderExamenPage = () => {
         };
         cargar();
     }, [intento_id]);
+
+    // Persistir respuestas al cambiar (evita perder avance en F5/recarga)
+    useEffect(() => {
+        if (cargando || entregado) return;
+        guardarRespuestas(respuestas);
+    }, [respuestas, cargando, entregado, guardarRespuestas]);
 
     // Bloquear botón atrás del navegador
     useEffect(() => {
@@ -146,6 +163,7 @@ const ResponderExamenPage = () => {
             }));
             await api.post(`/estudiante/intentos/${intento_id}/entregar`, { respuestas: payload });
             if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
+            localStorage.removeItem(`respuestas_${intento_id}`);
             setEntregado(true);
         } catch (err: unknown) {
             const e = err as { response?: { data?: { message?: string } } };
@@ -238,6 +256,7 @@ const ResponderExamenPage = () => {
     const handleSalirYCancelar = async (motivo: string) => {
         await cancelarExamen(intento_id!);
         if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
+        localStorage.removeItem(`respuestas_${intento_id}`);
         setCancelado(motivo);
     };
 
@@ -504,13 +523,14 @@ const ResponderExamenPage = () => {
             {dialogSalir && (
                 <ConfirmDialog
                     tipo="warning"
-                    mensaje="Si sales ahora, el examen quedará bloqueado y no podrás volver a realizarlo."
+                    mensaje="Si sales ahora, el examen será cancelado y tomado como reprobado. No podrás volver a realizarlo."
                     textoConfirmar="Sí, salir"
                     textoCancelar="Continuar examen"
                     onConfirmar={async () => {
                         setDialogSalir(false);
                         await cancelarExamen(intento_id!);
                         if (examen?.id) localStorage.removeItem(`intento_${examen.id}`);
+                        localStorage.removeItem(`respuestas_${intento_id}`);
                         navigate('/estudiante/examenes');
                     }}
                     onCancelar={() => setDialogSalir(false)}
@@ -520,7 +540,7 @@ const ResponderExamenPage = () => {
             {dialogFullscreen && (
                 <ConfirmDialog
                     tipo="warning"
-                    mensaje="Si sales del modo de pantalla completa, el examen será cancelado."
+                    mensaje="Si sales del modo de pantalla completa, el examen será cancelado y tomado como reprobado."
                     textoConfirmar="Salir y cancelar"
                     textoCancelar="Volver a pantalla completa"
                     onConfirmar={() => {
@@ -538,7 +558,7 @@ const ResponderExamenPage = () => {
             {dialogBlur && (
                 <ConfirmDialog
                     tipo="warning"
-                    mensaje="La ventana del examen perdió el foco. Si cambiás de ventana o pestaña, el examen será cancelado automáticamente."
+                    mensaje="La ventana del examen perdió el foco. Si cambiás de ventana o pestaña, el examen será cancelado y tomado como reprobado."
                     textoConfirmar="Entendido, continuar"
                     textoCancelar="Cancelar examen"
                     onConfirmar={() => {

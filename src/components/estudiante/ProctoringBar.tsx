@@ -26,7 +26,7 @@ const barStyleAudio = (db: number) => {
 };
 
 const ProctoringBar = ({ state }: Props) => {
-    const { permisoCamara, permisoMicro, fullscreenActivo, strikesRestantes, error, nivelMovimiento, nivelAudio } = state;
+    const { permisoCamara, permisoMicro, fullscreenActivo, strikesRestantes, error, advertencia, nivelMovimiento, nivelAudio } = state;
 
     const strikeDots = [1, 2].map(i => {
         const diff = strikesRestantes - i;
@@ -76,6 +76,11 @@ const ProctoringBar = ({ state }: Props) => {
             {error && (
                 <div className="proctoring-bar-error">
                     ⚠️ {error}
+                </div>
+            )}
+            {advertencia && (
+                <div className="proctoring-bar-warning">
+                    ⚠️ {advertencia}
                 </div>
             )}
         </div>

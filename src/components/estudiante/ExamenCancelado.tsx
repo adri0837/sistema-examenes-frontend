@@ -31,7 +31,7 @@ const ExamenCancelado = ({ motivo }: Props) => {
                 <h2>Examen Cancelado</h2>
                 <p>{motivoLabel(motivo)}</p>
                 <p style={{ fontSize: '0.88rem', color: '#9ca3af' }}>
-                    El examen ha sido cancelado y no podrás continuar.
+                    El examen ha sido cancelado y tomado como reprobado. No podrás continuar.
                     Contacta a tu administrador si crees que esto fue un error.
                 </p>
                 <button

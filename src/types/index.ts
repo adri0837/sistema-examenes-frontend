@@ -158,6 +158,8 @@ export interface ProctoringState {
     calibracionProgreso: number;
     blurAdvertencias: number;
     error: string | null;
+    /** Mensaje visible de la 1ª llamada de atención (advertencia), null si no hubo */
+    advertencia: string | null;
     /** 0.0-1.0 normalized pixel diff from baseline (live) */
     nivelMovimiento: number;
     /** Nivel de audio en dBFS (negativo, live). -60 ≈ silencio, 0 ≈ escala completa */
