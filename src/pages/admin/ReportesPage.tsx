@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
+import GraficoCalificaciones from '../../components/admin/GraficoCalificaciones';
 import api, { obtenerMensajeError } from '../../api/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -90,6 +91,17 @@ const ReportesPage = () => {
             ? `Reporte — ${reporte.examen?.titulo} (${reporte.examen?.categoria.nombre})`
             : `Reporte — ${reporte.estudiante?.nombre} (${reporte.estudiante?.email})`;
     };
+
+    const getDatosGrafico = () =>
+        (reporte?.intentos ?? [])
+            .filter(intento => intento.estado === 'CALIFICADO' && intento.calificacion_final !== null)
+            .map(intento => ({
+                nombre: tipoReporte === 'examen'
+                    ? (intento.estudiante?.nombre ?? '—')
+                    : (intento.examen?.titulo ?? '—'),
+                calificacion: limitarCalificacion(intento.calificacion_final),
+            }))
+            .sort((a, b) => b.calificacion - a.calificacion);
 
     const getColumnas = () =>
         tipoReporte === 'examen'
@@ -216,6 +228,13 @@ const ReportesPage = () => {
                                     </button>
                                 </div>
                             </div>
+
+                            <GraficoCalificaciones
+                                datos={getDatosGrafico()}
+                                titulo={tipoReporte === 'examen'
+                                    ? 'Calificaciones por estudiante'
+                                    : 'Calificaciones por examen'}
+                            />
 
                             <div className="admin-table-container">
                                 <table className="admin-table">
