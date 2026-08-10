@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import GraficoCalificaciones from '../../components/admin/GraficoCalificaciones';
+import api, { obtenerMensajeError } from '../../api/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatearCalificacion, limitarCalificacion } from '../../utils/calificacion';
@@ -16,13 +17,19 @@ interface IntentoReporte {
     examen?: { id: string; titulo: string; descripcion: string | null; categoria: { nombre: string }; };
 }
 
+interface Reporte {
+    examen?: { id: string; titulo: string; categoria: { nombre: string } };
+    estudiante?: { id: string; nombre: string; email: string };
+    intentos: IntentoReporte[];
+}
+
 const ReportesPage = () => {
     const [tipoReporte, setTipoReporte] = useState<'examen' | 'estudiante'>('examen');
     const [examenes, setExamenes] = useState<ExamenResumen[]>([]);
     const [estudiantes, setEstudiantes] = useState<EstudianteResumen[]>([]);
     const [examenSeleccionado, setExamenSeleccionado] = useState('');
     const [estudianteSeleccionado, setEstudianteSeleccionado] = useState('');
-    const [reporte, setReporte] = useState<any>(null);
+    const [reporte, setReporte] = useState<Reporte | null>(null);
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState('');
     const [dialog, setDialog] = useState<{ mensaje: string; onConfirmar: () => void } | null>(null);
@@ -71,8 +78,8 @@ const ReportesPage = () => {
                     setError('');
                     await api.delete(`/admin/estudiantes/${estudiante_id}/examenes/${examen_id}/oportunidad`);
                     cargarReporte();
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al dar oportunidad');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al dar oportunidad'));
                 }
             }
         });
@@ -81,9 +88,20 @@ const ReportesPage = () => {
     const getTitulo = (): string => {
         if (!reporte) return '';
         return tipoReporte === 'examen'
-            ? `Reporte — ${reporte.examen.titulo} (${reporte.examen.categoria.nombre})`
-            : `Reporte — ${reporte.estudiante.nombre} (${reporte.estudiante.email})`;
+            ? `Reporte — ${reporte.examen?.titulo} (${reporte.examen?.categoria.nombre})`
+            : `Reporte — ${reporte.estudiante?.nombre} (${reporte.estudiante?.email})`;
     };
+
+    const getDatosGrafico = () =>
+        (reporte?.intentos ?? [])
+            .filter(intento => intento.estado === 'CALIFICADO' && intento.calificacion_final !== null)
+            .map(intento => ({
+                nombre: tipoReporte === 'examen'
+                    ? (intento.estudiante?.nombre ?? '—')
+                    : (intento.examen?.titulo ?? '—'),
+                calificacion: limitarCalificacion(intento.calificacion_final),
+            }))
+            .sort((a, b) => b.calificacion - a.calificacion);
 
     const getColumnas = () =>
         tipoReporte === 'examen'
@@ -96,7 +114,7 @@ const ReportesPage = () => {
             : ['Examen', 'Categoría', 'Fecha de Entrega', 'Calificación'];
 
     const getFilas = () =>
-        reporte.intentos.map((intento: IntentoReporte) => [
+        (reporte?.intentos ?? []).map((intento: IntentoReporte) => [
             tipoReporte === 'examen'
                 ? intento.estudiante?.nombre ?? '—'
                 : intento.examen?.titulo ?? '—',
@@ -195,10 +213,10 @@ const ReportesPage = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
                                 <div>
                                     <h3 style={{ fontSize: '1.2rem', color: '#1a1a1a', margin: '0 0 0.25rem', fontWeight: 700 }}>
-                                        {tipoReporte === 'examen' ? reporte.examen.titulo : reporte.estudiante.nombre}
+                                        {tipoReporte === 'examen' ? reporte.examen?.titulo : reporte.estudiante?.nombre}
                                     </h3>
                                     <p style={{ color: '#6b7280', margin: 0, fontSize: '0.9rem' }}>
-                                        {tipoReporte === 'examen' ? reporte.examen.categoria.nombre : reporte.estudiante.email}
+                                        {tipoReporte === 'examen' ? reporte.examen?.categoria.nombre : reporte.estudiante?.email}
                                     </p>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -210,6 +228,13 @@ const ReportesPage = () => {
                                     </button>
                                 </div>
                             </div>
+
+                            <GraficoCalificaciones
+                                datos={getDatosGrafico()}
+                                titulo={tipoReporte === 'examen'
+                                    ? 'Calificaciones por estudiante'
+                                    : 'Calificaciones por examen'}
+                            />
 
                             <div className="admin-table-container">
                                 <table className="admin-table">

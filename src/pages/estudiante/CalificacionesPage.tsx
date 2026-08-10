@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import NavbarEstudiante from '../../components/estudiante/NavbarEstudiante';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import { formatearCalificacion } from '../../utils/calificacion';
 import '../admin/Admin.css';
 
@@ -26,8 +26,8 @@ const CalificacionesPage = () => {
             try {
                 const { data } = await api.get('/estudiante/calificaciones');
                 setCalificaciones(data);
-            } catch (e: any) {
-                setError(e.response?.data?.message || e.message || 'Error al cargar calificaciones');
+            } catch (e) {
+                setError(obtenerMensajeError(e, 'Error al cargar calificaciones'));
             } finally {
                 setCargando(false);
             }
@@ -71,10 +71,12 @@ const CalificacionesPage = () => {
                                             </td>
                                             <td style={{ color: '#6b7280' }}>{new Date(item.entregado_en).toLocaleDateString()} a las {new Date(item.entregado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                                             <td>
-                                                {item.estado === 'CALIFICADO'
-                                                    ? <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>{formatearCalificacion(item.calificacion_final)}</span>
-                                                    : <span className="badge badge-warning">En revisión</span>
-                                                }
+                                                {item.estado === 'CALIFICADO' && (
+                                                    <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>{formatearCalificacion(item.calificacion_final)}</span>
+                                                )}
+                                                {item.estado === 'ENTREGADO' && <span className="badge badge-warning">En revisión</span>}
+                                                {item.estado === 'EN_PROGRESO' && <span className="badge badge-info">En progreso</span>}
+                                                {item.estado === 'REPROBADO' && <span className="badge badge-danger">Reprobado</span>}
                                             </td>
                                         </tr>
                                     ))}

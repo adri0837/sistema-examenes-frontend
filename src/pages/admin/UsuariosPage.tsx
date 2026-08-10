@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import './Admin.css';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -42,8 +42,8 @@ const UsuariosPage = () => {
             setMostrarForm(false);
             setNombre(''); setEmail(''); setPassword('');
             cargarUsuarios();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al crear usuario');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al crear usuario'));
         }
     };
 
@@ -66,8 +66,8 @@ const UsuariosPage = () => {
                     setError('');
                     await api.delete(`/usuarios/${id}`);
                     cargarUsuarios();
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al eliminar usuario');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al eliminar usuario'));
                 }
             }
         });

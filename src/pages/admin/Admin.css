@@ -407,6 +407,12 @@
     border: 1px solid #fde68a;
 }
 
+.badge-danger {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
 .badge-info {
     background: var(--blue-light);
     color: var(--blue-text);

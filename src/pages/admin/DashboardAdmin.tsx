@@ -7,6 +7,8 @@ const tarjetas = [
     { titulo: 'Usuarios', descripcion: 'Gestionar estudiantes', emoji: '👥', ruta: '/admin/usuarios' },
     { titulo: 'Categorías', descripcion: 'Organizar temas de exámenes', emoji: '🗂️', ruta: '/admin/categorias' },
     { titulo: 'Exámenes', descripcion: 'Crear, editar y publicar exámenes', emoji: '📝', ruta: '/admin/examenes' },
+    { titulo: 'Grupos', descripcion: 'Organizar estudiantes y asignar exámenes', emoji: '🧑‍🤝‍🧑', ruta: '/admin/grupos' },
+    { titulo: 'Supervisión', descripcion: 'Revisar incidentes y evidencias en vivo', emoji: '🎥', ruta: '/admin/supervision' },
     { titulo: 'Revisión', descripcion: 'Calificar respuestas abiertas', emoji: '✏️', ruta: '/admin/revision' },
     { titulo: 'Reportes', descripcion: 'Resultados y exportación', emoji: '📊', ruta: '/admin/reportes' },
 ];

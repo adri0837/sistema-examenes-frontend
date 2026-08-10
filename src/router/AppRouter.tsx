@@ -18,6 +18,8 @@ import ExamenesPage from '../pages/admin/ExamenesPage';
 import ExamenDetallePage from '../pages/admin/ExamenDetallePage';
 import RevisionPage from '../pages/admin/RevisionPage';
 import ReportesPage from '../pages/admin/ReportesPage';
+import SupervisionPage from '../pages/admin/SupervisionPage';
+import GruposPage from '../pages/admin/GruposPage';
 
 const AppRouter = () => {
     const { usuario } = useAuth();
@@ -41,6 +43,8 @@ const AppRouter = () => {
                 <Route path="/admin/examenes" element={<ProtectedRoute rolRequerido="ADMIN"><ExamenesPage /></ProtectedRoute>} />
                 <Route path="/admin/examenes/:id" element={<ProtectedRoute rolRequerido="ADMIN"><ExamenDetallePage /></ProtectedRoute>} />
                 <Route path="/admin/revision" element={<ProtectedRoute rolRequerido="ADMIN"><RevisionPage /></ProtectedRoute>} />
+                <Route path="/admin/supervision" element={<ProtectedRoute rolRequerido="ADMIN"><SupervisionPage /></ProtectedRoute>} />
+                <Route path="/admin/grupos" element={<ProtectedRoute rolRequerido="ADMIN"><GruposPage /></ProtectedRoute>} />
                 <Route path="/admin/reportes" element={<ProtectedRoute rolRequerido="ADMIN"><ReportesPage /></ProtectedRoute>} />
 
                 <Route path="*" element={<Navigate to="/login" replace />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import './Admin.css';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -41,8 +41,8 @@ const CategoriasPage = () => {
             setMostrarForm(false);
             setNombre(''); setDescripcion('');
             cargarCategorias();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al crear categoría');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al crear categoría'));
         }
     };
 
@@ -54,8 +54,8 @@ const CategoriasPage = () => {
             setEditando(null);
             setNombre(''); setDescripcion('');
             cargarCategorias();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al editar categoría');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al editar categoría'));
         }
     };
 
@@ -68,8 +68,8 @@ const CategoriasPage = () => {
                     setError('');
                     await api.delete(`/categorias/${id}`);
                     cargarCategorias();
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al eliminar categoría');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al eliminar categoría'));
                 }
             }
         });

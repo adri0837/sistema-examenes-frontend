@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavbarAdmin from '../../components/admin/NavbarAdmin';
-import api from '../../api/axios';
+import api, { obtenerMensajeError } from '../../api/axios';
 import type { TipoPregunta } from '../../types';
 import './Admin.css';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -91,8 +91,8 @@ const ExamenDetallePage = () => {
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
             });
             limpiarForm(); cargarPreguntas();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al crear pregunta');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al crear pregunta'));
         }
     };
 
@@ -109,8 +109,8 @@ const ExamenDetallePage = () => {
                 espacios: tipo === 'COMPLETAR' ? espacios : undefined,
             });
             limpiarForm(); cargarPreguntas();
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Error al editar pregunta');
+        } catch (e) {
+            setError(obtenerMensajeError(e, 'Error al editar pregunta'));
         }
     };
 
@@ -133,8 +133,8 @@ const ExamenDetallePage = () => {
                     setError('');
                     await api.delete(`/examenes/${id}/intentos`);
                     setIntentos(0);
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al resetear intentos');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al resetear intentos'));
                 } finally {
                     setReseteando(false);
                 }
@@ -155,8 +155,8 @@ const ExamenDetallePage = () => {
                     setError('');
                     await api.delete(`/preguntas/${pregunta_id}`);
                     cargarPreguntas();
-                } catch (e: any) {
-                    setError(e.response?.data?.message || 'Error al eliminar pregunta');
+                } catch (e) {
+                    setError(obtenerMensajeError(e, 'Error al eliminar pregunta'));
                 }
             }
         });

@@ -25,7 +25,9 @@ const NavbarAdmin = () => {
                 <Link to="/admin/usuarios" className={isActive('/admin/usuarios') ? 'active' : ''}>Usuarios</Link>
                 <Link to="/admin/categorias" className={isActive('/admin/categorias') ? 'active' : ''}>Categorías</Link>
                 <Link to="/admin/examenes" className={isActive('/admin/examenes') ? 'active' : ''}>Exámenes</Link>
+                <Link to="/admin/grupos" className={isActive('/admin/grupos') ? 'active' : ''}>Grupos</Link>
                 <Link to="/admin/revision" className={isActive('/admin/revision') ? 'active' : ''}>Revisión</Link>
+                <Link to="/admin/supervision" className={isActive('/admin/supervision') ? 'active' : ''}>Supervisión</Link>
                 <Link to="/admin/reportes" className={isActive('/admin/reportes') ? 'active' : ''}>Reportes</Link>
             </div>
 
