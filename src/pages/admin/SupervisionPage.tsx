@@ -28,7 +28,7 @@ const formatearFecha = (f: string | null) => {
 };
 
 const renderEvidencia = (ev: Evidencia) => {
-    const src = `${BASE_MEDIA}${ev.url}`;
+    const src = `${BASE_MEDIA}${ev.url || '/uploads/evidencias/' + ev.archivo}`;
     const mime = (ev.mime || '').toLowerCase();
     if (mime.startsWith('image/')) {
         return <img src={src} alt="Evidencia" style={{ maxWidth: '100%', maxHeight: '180px', borderRadius: '8px', border: '1px solid #e8e5de' }} />;
@@ -174,14 +174,14 @@ const SupervisionPage = () => {
                                                     {expandido === intento.id ? 'Cerrar' : 'Revisar'}
                                                 </button>
                                                 <button
-                                                    onClick={() => { setAccion({ intentoId: intento.id, tipo: 'reprobar' }); setMotivo(''); }}
+                                                    onClick={() => { setExpandido(intento.id); setAccion({ intentoId: intento.id, tipo: 'reprobar' }); setMotivo(''); cargarDetalle(intento.id); }}
                                                     className="action-btn btn-danger"
                                                     style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
                                                 >
                                                     Reprobar
                                                 </button>
                                                 <button
-                                                    onClick={() => { setAccion({ intentoId: intento.id, tipo: 'reintento' }); setMotivo(''); }}
+                                                    onClick={() => { setExpandido(intento.id); setAccion({ intentoId: intento.id, tipo: 'reintento' }); setMotivo(''); cargarDetalle(intento.id); }}
                                                     disabled={!puedeReintento(intento)}
                                                     className="action-btn btn-success"
                                                     style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', opacity: puedeReintento(intento) ? 1 : 0.45, cursor: puedeReintento(intento) ? 'pointer' : 'not-allowed' }}

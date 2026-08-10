@@ -47,7 +47,6 @@ const RUIDO_MAX = 6;
 // salen muy bajos y apenas mueven el medidor. ~9.5 dB (gain 3x).
 const GANANCIA_MICRO = 3;
 // Ventana móvil de audio que se adjunta como evidencia ante un incidente
-const CHUNK_AUDIO_MS = 5000;
 const TAMANO_VENTANA_AUDIO_MS = 15000;
 
 // Nivel de audio en dBFS usando Float32 (más preciso que bytes para sonidos bajos)
@@ -163,9 +162,13 @@ const useProctoring = ({
     // Checks consecutivos de movimiento excesivo (sin él, una vibración de la
     // cámara dispara por frame y suma llamadas en segundos)
     const movimientoContinuoRef = useRef(0);
-    // Grabación continua de audio (ventana móvil) como evidencia
-    const audioChunksRef = useRef<Blob[]>([]);
+    // Grabación continua de audio: ventana móvil de ~TAMANO_VENTANA_AUDIO_MS como evidencia.
+    // Cada ciclo reinicia el MediaRecorder para que el blob SIEMPRE arranque con el header
+    // EBML: un blob de chunks recortados sin el primer chunk no es un WebM válido (0:00).
     const audioRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioVentanaActualRef = useRef<Blob | null>(null);   // datos en vivo vía requestData (header incluido)
+    const audioVentanaCompletaRef = useRef<Blob | null>(null); // último ciclo completo al hacer stop (siempre válido)
+    const audioCicloRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const handleCancelacionRef = useRef<((motivo: string, yaCanceladoEnServidor?: boolean) => Promise<void>) | null>(null);
     const reportarYProcesarRef = useRef<((tipo: string, descripcion?: string) => Promise<void>) | null>(null);
     const actualizarStrikesRef = useRef<(() => void) | null>(null);
@@ -199,16 +202,30 @@ const useProctoring = ({
         }
     }, []);
 
+    // Devuelve la ventana de audio inmediatamente anterior al incidente (SIEMPRE válida):
+    // prioriza los datos en vivo del ciclo actual (0..ahora, header incluido) y si no hay,
+    // el último ciclo completo.
+    const obtenerAudioVentana = useCallback(async (): Promise<Blob | null> => {
+        const rec = audioRecorderRef.current;
+        if (rec && rec.state === 'recording') {
+            try {
+                rec.requestData(); // dispara dataavailable con el buffer actual
+                await new Promise(r => setTimeout(r, 300));
+                if (audioVentanaActualRef.current && audioVentanaActualRef.current.size > 0) {
+                    return audioVentanaActualRef.current;
+                }
+            } catch { /* fallback al ciclo completo */ }
+        }
+        return audioVentanaCompletaRef.current;
+    }, []);
+
     // Sube la evidencia del incidente: captura + ventana de audio
     const subirEvidenciasIncidente = useCallback(async (incidenteId?: string) => {
         const foto = await capturarFotograma();
         if (foto) await subirEvidencia(intentoId, incidenteId, 'CAPTURA', foto, `captura_${Date.now()}.jpg`);
-        const chunks = audioChunksRef.current;
-        if (chunks.length > 0) {
-            const audio = new Blob(chunks, { type: 'audio/webm' });
-            await subirEvidencia(intentoId, incidenteId, 'GRABACION', audio, `audio_${Date.now()}.webm`);
-        }
-    }, [intentoId, capturarFotograma]);
+        const audio = await obtenerAudioVentana();
+        if (audio) await subirEvidencia(intentoId, incidenteId, 'GRABACION', audio, `audio_${Date.now()}.webm`);
+    }, [intentoId, capturarFotograma, obtenerAudioVentana]);
 
     // Reporta el incidente al servidor, actualiza las llamadas y decide si cancela
     const reportarYProcesar = useCallback(async (tipo: string, descripcion?: string) => {
@@ -296,24 +313,44 @@ const useProctoring = ({
             await video.play();
             videoRef.current = video;
 
-            // Grabación continua de audio (ventana móvil de ~15s) como evidencia
+            // Grabación continua de audio: ventana móvil de ~15s como evidencia.
+            // El recorder se reinicia cada TAMANO_VENTANA_AUDIO_MS para que cada ciclo
+            // arranque con el header EBML; un blob armado con chunks recortados pierde
+            // el header y el navegador muestra 0:00.
             const trackAudio = stream.getAudioTracks()[0];
             if (trackAudio && typeof MediaRecorder !== 'undefined') {
                 try {
                     const audioStream = new MediaStream([trackAudio]);
                     const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
                         .find(t => MediaRecorder.isTypeSupported(t));
-                    const recorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : undefined);
-                    recorder.ondataavailable = (e) => {
-                        if (e.data && e.data.size > 0) {
-                            audioChunksRef.current.push(e.data);
-                            const maxChunks = Math.ceil(TAMANO_VENTANA_AUDIO_MS / CHUNK_AUDIO_MS);
-                            while (audioChunksRef.current.length > maxChunks) audioChunksRef.current.shift();
-                        }
+
+                    const crearRecorder = () => {
+                        const recorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : undefined);
+                        recorder.ondataavailable = (e) => {
+                            if (e.data && e.data.size > 0) {
+                                audioVentanaActualRef.current = e.data;
+                            }
+                        };
+                        recorder.onstop = () => {
+                            if (audioVentanaActualRef.current && audioVentanaActualRef.current.size > 0) {
+                                audioVentanaCompletaRef.current = audioVentanaActualRef.current;
+                            }
+                        };
+                        recorder.start();
+                        return recorder;
                     };
-                    recorder.start(CHUNK_AUDIO_MS);
-                    audioRecorderRef.current = recorder;
-                } catch {
+
+                    audioRecorderRef.current = crearRecorder();
+                    // Cada TAMANO_VENTANA_AUDIO_MS se cierra el ciclo (stop → blob completo
+                    // válido) y se abre uno nuevo: siempre hay una ventana completa reciente.
+                    audioCicloRef.current = setInterval(() => {
+                        const rec = audioRecorderRef.current;
+                        if (rec && rec.state === 'recording') {
+                            rec.stop();
+                            audioRecorderRef.current = crearRecorder();
+                        }
+                    }, TAMANO_VENTANA_AUDIO_MS);
+            } catch {
                     // Grabación continua no disponible — solo capturas de imagen
                 }
             }
@@ -522,7 +559,7 @@ const useProctoring = ({
                         : 0;
                     if (mirandoFueraContinuoRef.current >= CHECK_SOSTENIDO_VOLTEO) {
                         mirandoFueraContinuoRef.current = 0;
-                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', `Mirada fuera de cámara (yaw ${resultado.yaw?.toFixed(2)}, pitch ${resultado.pitch?.toFixed(2)})`);
+                        void reportarYProcesarRef.current?.('MIRADA_FUERA', `Mirada fuera de cámara (yaw ${resultado.yaw?.toFixed(2)}, pitch ${resultado.pitch?.toFixed(2)})`);
                     }
 
                     // ── Sin rostro sostenido → SIN_CAMARA ──
@@ -540,7 +577,7 @@ const useProctoring = ({
                         : ojosCerradosContinuoRef.current + 1;
                     if (ojosCerradosContinuoRef.current >= CHECK_SOSTENIDO_OJOS) {
                         ojosCerradosContinuoRef.current = 0;
-                        void reportarYProcesarRef.current?.('MOVIMIENTO_SOSPECHOSO', 'Ojos cerrados detectados');
+                        void reportarYProcesarRef.current?.('OJOS_CERRADOS', 'Ojos cerrados detectados');
                     }
 
                     // ── Boca abierta sostenida → RUIDO (posible conversación) ──
@@ -549,7 +586,7 @@ const useProctoring = ({
                         : bocaAbiertaContinuoRef.current + 1;
                     if (bocaAbiertaContinuoRef.current >= CHECK_SOSTENIDO_BOCA) {
                         bocaAbiertaContinuoRef.current = 0;
-                        void reportarYProcesarRef.current?.('RUIDO_SOSPECHOSO', 'Boca abierta (posible conversación)');
+                        void reportarYProcesarRef.current?.('BOCA_ABIERTA', 'Boca abierta (posible conversación)');
                     }
 
                     // ── Cabeza volteada sostenida → MOVIMIENTO_SOSPECHOSO ──
@@ -624,10 +661,12 @@ const useProctoring = ({
             mountedRef.current = false;
             if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
             if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
+            if (audioCicloRef.current) clearInterval(audioCicloRef.current);
             if (audioRecorderRef.current && audioRecorderRef.current.state !== 'inactive') {
                 audioRecorderRef.current.stop();
             }
-            audioChunksRef.current = [];
+            audioVentanaActualRef.current = null;
+            audioVentanaCompletaRef.current = null;
             if (videoRef.current) {
                 videoRef.current.pause();
                 videoRef.current.srcObject = null;

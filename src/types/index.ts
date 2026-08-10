@@ -99,6 +99,9 @@ export type IncidenteTipo =
     | 'CAMBIO_VENTANA'
     | 'CIERRE_NAVEGADOR'
     | 'SALIR_PANTALLA_COMPLETA'
+    | 'OJOS_CERRADOS'
+    | 'BOCA_ABIERTA'
+    | 'MIRADA_FUERA'
     | 'MOVIMIENTO_SOSPECHOSO'
     | 'RUIDO_SOSPECHOSO'
     | 'COPIA';
